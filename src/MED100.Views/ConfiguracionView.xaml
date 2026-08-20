@@ -1,0 +1,493 @@
+<UserControl x:Class="MED100.Views.ConfiguracionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+    <StackPanel MaxWidth="740" HorizontalAlignment="Left">
+
+      <!-- ===== Licencia ===== -->
+      <!-- Primera de la lista a propósito: mientras la prueba corre, es lo
+           que el dueño va a venir a buscar. Una vez activada queda como una
+           línea que dice "completa" y deja de llamar la atención. -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Licencia" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="{Binding LicenciaTitulo}" Style="{DynamicResource Texto.CuerpoEnfatizado}"
+                     Margin="0,10,0,0" />
+          <TextBlock Text="{Binding LicenciaDetalle}" Style="{DynamicResource Texto.Caption}"
+                     TextWrapping="Wrap" Margin="0,4,0,0" />
+          <Button Content="Escribir la llave del producto"
+                  Style="{DynamicResource Boton.Secundario}"
+                  HorizontalAlignment="Left" Margin="0,14,0,0"
+                  Visibility="{Binding LicenciaActivada, Converter={StaticResource InversorBoolVisibilidad}}"
+                  Command="{Binding ActivarLicenciaCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Apariencia ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Apariencia" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Agranda toda la interfaz —incluidos los títulos de las columnas— sin reiniciar la aplicación."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <TextBlock Text="Tamaño del texto" Style="{DynamicResource Input.Label}" />
+          <ComboBox Width="220" HorizontalAlignment="Left"
+                    ItemsSource="{Binding Tamanos}"
+                    SelectedItem="{Binding TamanoTextoSeleccionado}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Datos del negocio ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Datos del negocio" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Aparecen en el encabezado de cada factura y del cierre de caja."
+                     Style="{DynamicResource Texto.Caption}" Margin="0,4,0,16" />
+
+          <TextBlock Text="Nombre del negocio" Style="{DynamicResource Input.Label}" />
+          <TextBox Style="{DynamicResource Input.Texto}"
+                   Text="{Binding NombreNegocio, UpdateSourceTrigger=PropertyChanged}" />
+
+          <Grid Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="16" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="RNC (opcional)" Style="{DynamicResource Input.Label}" />
+              <TextBox Style="{DynamicResource Input.Texto}"
+                       Text="{Binding Rnc, UpdateSourceTrigger=PropertyChanged}"
+                       ToolTip="Si lo dejas vacío, no se imprime." />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Teléfono" Style="{DynamicResource Input.Label}" />
+              <TextBox Style="{DynamicResource Input.Texto}"
+                       Text="{Binding Telefono, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Text="Dirección" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+          <TextBox Style="{DynamicResource Input.Texto}"
+                   Text="{Binding Direccion, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Cálculos e impuestos ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Cálculos e impuestos" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Esta es la única llave del ITBIS de todo el sistema (antes había también una casilla por procedimiento, y se quitó). Si lo desactivás, desaparece de la pantalla Vender y del ticket, y las facturas salen sin impuesto."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,14" />
+
+          <!-- La regla de fondo de MED-100 y la diferencia con un POS común:
+               el ITBIS NO se cobra sobre todo, sale solo de la base gravada. -->
+          <Border Background="{DynamicResource Brush.FondoEncabezadoTabla}" CornerRadius="8"
+                  Padding="12,10" Margin="0,0,0,16">
+            <TextBlock TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource Brush.TextoSecundario}"
+                       Text="Aunque esté prendido, el ITBIS sale SOLO de los insumos: los procedimientos son servicios de salud y en el país van exentos. En una factura de consulta 1,500 + gasa 100, el impuesto se calcula sobre los 100." />
+          </Border>
+
+          <CheckBox Content="Cobrar ITBIS en las ventas" IsChecked="{Binding ItbisActivo}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <Grid Margin="0,14,0,0" IsEnabled="{Binding ItbisActivo}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="16" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="Tasa de ITBIS (%)" Style="{DynamicResource Input.Label}" />
+              <TextBox Style="{DynamicResource Input.Texto}"
+                       Text="{Binding ItbisTasaTexto, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Redondeo del total" Style="{DynamicResource Input.Label}" />
+              <ComboBox ItemsSource="{Binding Redondeos}"
+                        SelectedItem="{Binding RedondeoSeleccionado}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Ventas y facturación ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Ventas y facturación" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Al desactivarlo, la pantalla Vender no pide cliente: las facturas salen como consumidor final."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <CheckBox Content="Mostrar selección de cliente en la pantalla Vender"
+                    IsChecked="{Binding MostrarClienteEnVenta}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Seguros / ARS ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Seguros / ARS" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Al apagarlo, la pantalla de cobro ni menciona la ARS. Lo que cubre el seguro NO es un descuento: se guarda aparte y no cuenta en la caja del día, porque entra por otra vía y en otro momento."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <CheckBox Content="Usar seguros / ARS al cobrar" IsChecked="{Binding ArsActivo}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <StackPanel Margin="0,16,0,0" IsEnabled="{Binding ArsActivo}">
+            <StackPanel Orientation="Horizontal">
+              <TextBox Width="260" Height="34" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding ArsNueva, UpdateSourceTrigger=PropertyChanged}"
+                       ToolTip="Nombre de la aseguradora" />
+              <Button Content="Agregar" Margin="10,0,0,0" Style="{DynamicResource Boton.Secundario}"
+                      Command="{Binding AgregarArsCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding MensajeArs}" TextWrapping="Wrap" Margin="2,8,0,0"
+                       Foreground="{DynamicResource Brush.Destructivo}"
+                       Style="{DynamicResource Texto.Caption}" />
+
+            <Border Style="{DynamicResource Card}" Padding="0" Margin="0,12,0,0" MaxHeight="260">
+              <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Aseguradoras}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Aseguradora" Binding="{Binding Nombre}" Width="*" MinWidth="160"
+                                      HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+                  <DataGridTemplateColumn Header="Estado" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock FontSize="12" VerticalAlignment="Center">
+                          <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                              <Setter Property="Text" Value="Inactiva" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.TextoTerciario}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding Activo}" Value="True">
+                                  <Setter Property="Text" Value="Activa" />
+                                  <Setter Property="Foreground" Value="{DynamicResource Brush.AlDia.Texto}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </TextBlock.Style>
+                        </TextBlock>
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <!-- No hay "eliminar": una ARS con facturas tiene que seguir
+                       teniendo nombre cuando se reimprima el comprobante -->
+                  <DataGridTemplateColumn Width="140">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <Button Content="Activar / desactivar" Style="{DynamicResource Boton.Terciario}"
+                                Command="{Binding DataContext.AlternarArsCommand,
+                                          RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                CommandParameter="{Binding}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Sala de espera ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Sala de espera" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="El papelito del turno es un documento APARTE del recibo: el paciente se lo lleva al entrar, antes de que exista factura. El número reinicia todos los días."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <StackPanel Orientation="Horizontal">
+            <StackPanel>
+              <TextBlock Text="Prefijo del turno (opcional)" Style="{DynamicResource Input.Label}" />
+              <TextBox Width="120" Height="34" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding TurnoPrefijo, UpdateSourceTrigger=PropertyChanged}"
+                       ToolTip="Escribí A para que los turnos salgan A-1, A-2..." />
+            </StackPanel>
+            <TextBlock Text="Dejalo vacío y los turnos serán 1, 2, 3…"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       VerticalAlignment="Bottom" Margin="12,0,0,8" />
+          </StackPanel>
+
+          <CheckBox Content="Imprimir el turno sin preguntar al darlo" Margin="0,14,0,0"
+                    IsChecked="{Binding TurnoImprimirAuto}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+          <TextBlock Text="Es el flujo normal del mostrador: el paciente está parado esperando el papel. Si lo destildás, se muestra la vista previa cada vez."
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     TextWrapping="Wrap" Margin="24,4,0,0" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Impresión y ticket ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Impresión y ticket" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Al cobrar, el ticket se imprime solo. Activa la vista previa solo si quieres revisarlo antes."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <CheckBox Content="Mostrar vista previa antes de imprimir el ticket de venta"
+                    IsChecked="{Binding MostrarVistaPreviaTicket}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <TextBlock Text="Copias del ticket (1 a 3)" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+          <TextBox Width="120" HorizontalAlignment="Left" Style="{DynamicResource Input.Texto}"
+                   Text="{Binding CopiasTicketTexto, UpdateSourceTrigger=PropertyChanged}" />
+
+          <TextBlock Text="Mensaje al pie del ticket" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+          <TextBox Style="{DynamicResource Input.Texto}"
+                   Text="{Binding TicketPie, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Cierre de caja automático ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Cierre de caja automático" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="A la hora indicada, esta computadora cierra el cuadre del día de todos los cajeros. Si la app está cerrada a esa hora, el cierre se hace al volver a abrirla."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <CheckBox Content="Cerrar la caja automáticamente cada día"
+                    IsChecked="{Binding CierreAutomaticoActivo}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <StackPanel Margin="0,14,0,0" IsEnabled="{Binding CierreAutomaticoActivo}">
+            <TextBlock Text="Hora del cierre" Style="{DynamicResource Input.Label}" />
+            <ComboBox Width="180" HorizontalAlignment="Left" MaxDropDownHeight="260"
+                      ItemsSource="{Binding Horas}"
+                      SelectedItem="{Binding HoraCierreSeleccionada}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Respaldo de la base de datos ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Respaldo de la base de datos" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Es la forma correcta de cambiar de equipo: el respaldo conserva TODO (ventas, numeración de facturas, productos, clientes, usuarios e historial). Guárdalo en un USB o la nube."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,10" />
+
+          <!-- Los papeles del paciente NO están en el .sql: van en su propio
+               ZIP. Restaurar solo la base dejaría cada expediente apuntando a
+               archivos que no están. -->
+          <Border Background="{DynamicResource Brush.FondoEncabezadoTabla}" CornerRadius="8"
+                  Padding="12,10" Margin="0,0,0,16">
+            <TextBlock TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource Brush.TextoSecundario}"
+                       Text="«Respaldar ahora» genera DOS archivos: el de la base de datos y un ZIP con los expedientes de los pacientes (las cédulas, carnés y estudios escaneados no caben en el respaldo de la base). Hacen falta los dos para restaurar." />
+          </Border>
+
+          <StackPanel Orientation="Horizontal">
+            <Button Content="Respaldar ahora" Style="{DynamicResource Boton.Primario}"
+                    Click="BotonRespaldar_Click"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+            <Button Content="Restaurar desde archivo…" Style="{DynamicResource Boton.Secundario}"
+                    Margin="12,0,0,0" Click="BotonRestaurar_Click"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+          </StackPanel>
+          <TextBlock Text="Restaurar reemplaza los datos actuales. Se pide doble confirmación."
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.Destructivo}" Margin="0,10,0,0" />
+
+          <!-- ===== Copias en PDF (pedido 2026-08-15) ===== -->
+          <Border Height="1" Background="{DynamicResource Brush.BordeSutil}" Margin="0,20,0,16" />
+          <TextBlock Text="COPIAS EN EL EXPEDIENTE" Style="{DynamicResource Texto.MicroLabel}" />
+          <TextBlock TextWrapping="Wrap" Margin="0,6,0,12"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}"
+                     Text="Al emitir el documento se guarda además una copia en PDF dentro del expediente del paciente. Es el mismo papel que sale por la impresora, no una versión distinta." />
+
+          <CheckBox Content="Guardar copia en PDF de cada factura" FontSize="13"
+                    Foreground="{DynamicResource Brush.TextoPrincipal}"
+                    IsChecked="{Binding ArchivarFacturaPdf}" />
+          <TextBlock TextWrapping="Wrap" Margin="27,4,0,0"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     Text="Las facturas de consumidor final no se archivan: sin paciente no hay expediente donde ponerlas." />
+
+          <CheckBox Content="Guardar copia en PDF de los turnos de sala" Margin="0,12,0,0"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}"
+                    IsChecked="{Binding ArchivarTurnoPdf}" />
+          <TextBlock TextWrapping="Wrap" Margin="27,4,0,0"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     Text="Apagado a propósito: el turno es un papelito que se tira al salir del consultorio, y un paciente frecuente juntaría decenas de PDF que no le sirven a nadie." />
+
+          <!-- Escanear documentos llena un disco: se puede apuntar a otra unidad -->
+          <TextBlock Text="Carpeta de los expedientes" Style="{DynamicResource Input.Label}"
+                     Margin="0,18,0,6" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="12" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}" IsReadOnly="True"
+                     Text="{Binding CarpetaExpedientes, Mode=OneWay}" />
+            <Button Grid.Column="2" Content="Cambiar…" Style="{DynamicResource Boton.Secundario}"
+                    Click="BotonCarpetaExpedientes_Click" />
+          </Grid>
+          <TextBlock TextWrapping="Wrap" Margin="2,6,0,0"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     Text="Ahí van los archivos que se suben al expediente de cada paciente. Escanear documentos llena un disco: si el C: queda corto, apuntala a otra unidad. Los archivos que ya están NO se mueven solos." />
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Aviso de caducidad por correo ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Aviso de caducidad por correo (Gmail)" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,4"
+                     Text="Le envía UN correo al dueño con los productos ya caducados y los que están por caducar, con las unidades y el valor en riesgo. A los clientes no se les escribe. Si no hay nada que avisar, no se manda correo." />
+
+          <!-- La causa número uno de fallos es usar la contraseña normal -->
+          <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,0,0,16">
+            <Run Text="La 'Contraseña de aplicación' NO es tu contraseña de Gmail: es un código de 16 letras que genera Google (la cuenta debe tener la verificación en 2 pasos activada). Pasos: 1) abrí " />
+            <Hyperlink NavigateUri="https://myaccount.google.com/apppasswords"
+                       RequestNavigate="Hyperlink_RequestNavigate">myaccount.google.com/apppasswords</Hyperlink>
+            <Run Text="; 2) escribí un nombre (ej: MED-100) y tocá 'Crear'; 3) copiá las 16 letras y pegalas acá (los espacios se quitan solos)." />
+          </TextBlock>
+
+          <CheckBox Content="Activar el aviso de caducidad por correo" FontSize="13"
+                    IsChecked="{Binding RecordatoriosActivos}" />
+
+          <StackPanel Margin="24,12,0,0" IsEnabled="{Binding RecordatoriosActivos}">
+            <WrapPanel>
+              <StackPanel Margin="0,0,16,8">
+                <TextBlock Text="Cuenta Gmail (remitente)" Style="{DynamicResource Input.Label}" />
+                <TextBox Width="240" Height="34" Style="{DynamicResource Input.Texto}"
+                         Text="{Binding GmailRemitente, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+              <StackPanel Margin="0,0,16,8">
+                <TextBlock Text="Contraseña de aplicación" Style="{DynamicResource Input.Label}" />
+                <PasswordBox x:Name="CampoGmailPassword" Width="200" Height="34"
+                             Style="{DynamicResource Input.Password}"
+                             PasswordChanged="CampoGmailPassword_PasswordChanged" />
+                <TextBlock Text="✓ Contraseña guardada — dejá el campo vacío para conservarla."
+                           Style="{DynamicResource Texto.Caption}" Margin="0,4,0,0"
+                           Visibility="{Binding HayAppPasswordGuardada, Converter={StaticResource BoolAVisibilidad}}" />
+              </StackPanel>
+              <StackPanel Margin="0,0,16,8">
+                <TextBlock Text="Correo del dueño (destinatario)" Style="{DynamicResource Input.Label}" />
+                <TextBox Width="240" Height="34" Style="{DynamicResource Input.Texto}"
+                         Text="{Binding CorreoDueno, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+            </WrapPanel>
+
+            <CheckBox Content="Enviar automáticamente al abrir el programa (una vez al día)"
+                      FontSize="13" Margin="0,6,0,0"
+                      IsChecked="{Binding RecordatoriosAutomaticos}" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+              <Button Content="Enviar aviso ahora" Style="{DynamicResource Boton.Primario}"
+                      Command="{Binding EnviarAvisoCommand}"
+                      IsEnabled="{Binding OcupadoCorreo, Converter={StaticResource InversorBool}}" />
+              <TextBlock Text="{Binding UltimoAvisoTexto}" Style="{DynamicResource Texto.Caption}"
+                         VerticalAlignment="Center" Margin="12,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="{Binding MensajeCorreo}" Style="{DynamicResource Texto.Caption}"
+                       TextWrapping="Wrap" Margin="0,8,0,0" />
+          </StackPanel>
+
+          <!-- Recordatorio de cita: usa la MISMA cuenta de Gmail de arriba,
+               pero el destinatario es cada paciente, no el dueño. -->
+          <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                  Margin="0,20,0,16" />
+
+          <TextBlock Text="Recordatorio de cita al paciente" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,14"
+                     Text="Le manda un correo a CADA paciente con cita próxima, recordándole el día, la hora y con qué médico. Usa la misma cuenta de Gmail de arriba. A un paciente sin correo cargado no se le puede avisar, y a cada cita se le avisa una sola vez." />
+
+          <CheckBox Content="Enviar recordatorios de cita por correo" FontSize="13"
+                    IsChecked="{Binding RecordatorioCitasActivo}" />
+
+          <StackPanel Margin="24,12,0,0" IsEnabled="{Binding RecordatorioCitasActivo}">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Avisar con" Style="{DynamicResource Texto.Cuerpo}"
+                         VerticalAlignment="Center" />
+              <TextBox Width="60" Height="34" Margin="8,0" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding RecordatorioCitasHorasTexto, UpdateSourceTrigger=PropertyChanged}" />
+              <TextBlock Text="horas de anticipación" Style="{DynamicResource Texto.Cuerpo}"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="24 horas es lo habitual: el día antes el paciente todavía puede reacomodarse o avisar que no viene."
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       TextWrapping="Wrap" Margin="0,6,0,0" />
+
+            <Button Content="Enviar recordatorios ahora" Style="{DynamicResource Boton.Primario}"
+                    HorizontalAlignment="Left" Margin="0,14,0,0"
+                    Command="{Binding EnviarRecordatorioCitasCommand}"
+                    IsEnabled="{Binding OcupadoCorreo, Converter={StaticResource InversorBool}}" />
+            <TextBlock Text="{Binding MensajeCitas}" Style="{DynamicResource Texto.Caption}"
+                       TextWrapping="Wrap" Margin="0,8,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- ===== Exportación a Excel ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Exportación a Excel" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Text="Genera un .xlsx con todos los datos (una hoja por tabla: clientes, productos, facturas, detalle, cuadres, usuarios e historial). Es para consultar y contabilizar; para migrar de equipo usa el respaldo."
+                     Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+          <Button Content="Exportar ahora" Style="{DynamicResource Boton.Primario}"
+                  HorizontalAlignment="Left" Click="BotonExportar_Click"
+                  IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+
+          <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                  Margin="0,18,0,14" />
+
+          <CheckBox Content="Exportar automáticamente cada cierto tiempo"
+                    IsChecked="{Binding ExportAutomaticoActivo}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <Grid Margin="0,14,0,0" IsEnabled="{Binding ExportAutomaticoActivo}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="140" />
+              <ColumnDefinition Width="12" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="12" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="Cada (días)" Style="{DynamicResource Input.Label}" />
+              <TextBox Style="{DynamicResource Input.Texto}"
+                       Text="{Binding ExportCadaDiasTexto, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Carpeta de destino" Style="{DynamicResource Input.Label}" />
+              <TextBox Style="{DynamicResource Input.Texto}" IsReadOnly="True"
+                       Text="{Binding ExportCarpeta}" />
+            </StackPanel>
+            <Button Grid.Column="4" Content="Elegir…" Style="{DynamicResource Boton.Secundario}"
+                    VerticalAlignment="Bottom" Click="BotonCarpeta_Click" />
+          </Grid>
+
+          <TextBlock Style="{DynamicResource Texto.Caption}" Margin="0,10,0,0"
+                     Text="{Binding UltimaExportacionTexto, StringFormat='Última exportación automática: {0}'}" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding MensajeError}"
+                 Foreground="{DynamicResource Brush.Destructivo}"
+                 Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="4,0,0,0" />
+      <TextBlock Text="{Binding MensajeExito}"
+                 Foreground="{DynamicResource Brush.DeltaPositivo}"
+                 Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="4,0,0,0" />
+
+      <StackPanel Orientation="Horizontal" Margin="0,16,0,24">
+        <Button Content="Guardar cambios" Style="{DynamicResource Boton.Primario}"
+                Command="{Binding GuardarCommand}"
+                IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+        <Button Content="Descartar" Style="{DynamicResource Boton.Secundario}" Margin="12,0,0,0"
+                Command="{Binding DescartarCommand}" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

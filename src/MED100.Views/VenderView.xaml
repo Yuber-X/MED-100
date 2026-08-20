@@ -1,0 +1,217 @@
+<UserControl x:Class="MED100.Views.VenderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="16" />
+      <ColumnDefinition Width="340" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ============ IZQUIERDA: búsqueda + carrito ============ -->
+    <Grid Grid.Column="0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <TextBox Grid.Row="0" Style="{DynamicResource Input.Texto}"
+               Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+               ToolTip="Escaneá el código o escribí el nombre del procedimiento o del insumo" />
+
+      <!-- Resultados de búsqueda (clic para agregar) -->
+      <ItemsControl Grid.Row="1" ItemsSource="{Binding Resultados}" Margin="0,8,0,0">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Button Style="{DynamicResource Boton.Terciario}" HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Stretch"
+                    Command="{Binding DataContext.AgregarCommand,
+                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    CommandParameter="{Binding}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                           Text="{Binding Precio, Converter={StaticResource Money}}" />
+                <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Caption}"
+                           Margin="24,0,16,0" VerticalAlignment="Center"
+                           Text="{Binding DetalleTexto}" />
+                <TextBlock Text="{Binding Nombre}" Style="{DynamicResource Texto.Cuerpo}" />
+              </DockPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Carrito -->
+      <Border Grid.Row="2" Style="{DynamicResource Card}" Padding="0" Margin="0,12,0,0">
+        <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Carrito}">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Concepto" Binding="{Binding Nombre}" Width="*" MinWidth="150"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <!-- Se muestra el tipo porque decide dos cosas: si lleva ITBIS y si
+                 cuenta para el honorario del médico -->
+            <DataGridTextColumn Header="Tipo" Binding="{Binding TipoTexto}" Width="Auto" MinWidth="110" />
+            <DataGridTextColumn Header="Precio"
+                                Binding="{Binding Precio, Converter={StaticResource Money}}" Width="Auto" MinWidth="120">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTemplateColumn Header="Cantidad" Width="130">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="−" Width="26" Style="{DynamicResource Boton.Terciario}"
+                            Command="{Binding DataContext.MenosCommand,
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}" />
+                    <TextBlock Text="{Binding Cantidad}" MinWidth="32" TextAlignment="Center"
+                               VerticalAlignment="Center" Style="{DynamicResource Texto.CuerpoEnfatizado}" />
+                    <Button Content="+" Width="26" Style="{DynamicResource Boton.Terciario}"
+                            Command="{Binding DataContext.MasCommand,
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Subtotal"
+                                Binding="{Binding Subtotal, Converter={StaticResource Money}}" Width="Auto" MinWidth="130">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTemplateColumn Width="110">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Button Content="Quitar" Style="{DynamicResource Boton.Terciario}"
+                          Foreground="{DynamicResource Brush.Destructivo}"
+                          Command="{Binding DataContext.QuitarCommand,
+                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                          CommandParameter="{Binding}" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Border>
+    </Grid>
+
+    <!-- ============ DERECHA: resumen y cobro ============ -->
+    <!-- El Padding del card se reparte: el ScrollViewer llega hasta el borde
+         derecho y el contenido se separa de la barra con su propio Padding.
+         Así la barra no queda encima del texto ni pegada a él. -->
+    <Border Grid.Column="2" Style="{DynamicResource Card}" Padding="20,20,8,20">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+      <StackPanel>
+        <!-- Aviso cuando el cobro vino de la agenda -->
+        <Border Background="{DynamicResource Brush.PrimarioSutil}" CornerRadius="8"
+                Padding="12,8" Margin="0,0,0,14"
+                Visibility="{Binding HayCitaEnCobro, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock Text="{Binding AvisoCita}" TextWrapping="Wrap"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.Primario}" />
+        </Border>
+
+        <!-- Paciente (regla Yuber: opcional, y ocultable desde Configuración) -->
+        <StackPanel Visibility="{Binding MostrarCliente, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock Text="Paciente (opcional)" Style="{DynamicResource Input.Label}" />
+          <ComboBox Height="40" FontSize="13"
+                    ItemsSource="{Binding Clientes}"
+                    SelectedItem="{Binding ClienteSeleccionado}" />
+        </StackPanel>
+
+        <!-- El médico va en la factura para que sepa que le toca el paciente
+             correcto, y de sus procedimientos sale su honorario -->
+        <TextBlock Text="Médico" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+        <ComboBox Height="40" FontSize="13"
+                  ItemsSource="{Binding Medicos}"
+                  SelectedItem="{Binding MedicoSeleccionado}" />
+        <TextBlock Text="Obligatorio: la factura tiene procedimientos."
+                   Style="{DynamicResource Texto.Caption}"
+                   Foreground="{DynamicResource Brush.TextoTerciario}" Margin="2,4,0,0"
+                   Visibility="{Binding MedicoObligatorio, Converter={StaticResource BoolAVisibilidad}}" />
+
+        <!-- Seguro. Todo el bloque desaparece si el módulo está apagado -->
+        <StackPanel Visibility="{Binding MostrarArs, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock Text="Seguro / ARS" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+          <ComboBox Height="40" FontSize="13"
+                    ItemsSource="{Binding Aseguradoras}"
+                    SelectedItem="{Binding ArsSeleccionada}" />
+
+          <StackPanel Visibility="{Binding HayArs, Converter={StaticResource BoolAVisibilidad}}">
+            <TextBlock Text="Autorización" Style="{DynamicResource Input.Label}" Margin="0,10,0,6" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding ArsAutorizacion, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="Cubre el seguro (RD$)" Style="{DynamicResource Input.Label}" Margin="0,10,0,6" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding ArsCubiertoTexto, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
+            <TextBlock TextWrapping="Wrap" Margin="2,4,0,0"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       Text="No es un descuento: es plata que entra por otra vía. No cuenta en la caja del día." />
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Text="NCF (opcional)" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+        <TextBox Style="{DynamicResource Input.Texto}"
+                 Text="{Binding Ncf, UpdateSourceTrigger=PropertyChanged}"
+                 ToolTip="Comprobante fiscal. Se escribe a mano; no se repite entre facturas." />
+
+        <TextBlock Text="Método de pago" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+        <ComboBox Height="40" FontSize="13"
+                  ItemsSource="{Binding MetodosPago}"
+                  SelectedItem="{Binding MetodoSeleccionado}" />
+
+        <StackPanel Visibility="{Binding PideEfectivo, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock Text="Efectivo recibido" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+          <TextBox Style="{DynamicResource Input.Texto}"
+                   Text="{Binding EfectivoTexto, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+
+        <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                Margin="0,18,0,12" />
+
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                     Text="{Binding Subtotal, Converter={StaticResource Money}}" />
+          <TextBlock Text="Subtotal" Style="{DynamicResource Texto.Cuerpo}" />
+        </DockPanel>
+        <!-- La línea del ITBIS solo aparece si de verdad hay impuesto: en una
+             clínica casi todo es servicio de salud exento -->
+        <DockPanel Margin="0,6,0,0"
+                   Visibility="{Binding HayItbis, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                     Text="{Binding Itbis, Converter={StaticResource Money}}" />
+          <TextBlock Text="{Binding ItbisEtiqueta}" Style="{DynamicResource Texto.Cuerpo}" />
+        </DockPanel>
+        <DockPanel Margin="0,10,0,0">
+          <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.MontoTotal}"
+                     Text="{Binding Total, Converter={StaticResource Money}}" />
+          <TextBlock Text="TOTAL" Style="{DynamicResource Texto.Titulo3}" />
+        </DockPanel>
+        <!-- Con seguro, lo que se cobra en el mostrador es ESTO -->
+        <DockPanel Margin="0,8,0,0"
+                   Visibility="{Binding HayArs, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.MontoTotal}"
+                     Foreground="{DynamicResource Brush.Primario}"
+                     Text="{Binding PacientePaga, Converter={StaticResource Money}}" />
+          <TextBlock Text="PAGA EL PACIENTE" Style="{DynamicResource Texto.Titulo3}"
+                     Foreground="{DynamicResource Brush.Primario}" />
+        </DockPanel>
+        <DockPanel Margin="0,8,0,0">
+          <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                     Text="{Binding CambioTexto}" />
+          <TextBlock Text="Cambio" Style="{DynamicResource Texto.Cuerpo}" />
+        </DockPanel>
+
+        <Button Content="COBRAR" Style="{DynamicResource Boton.Primario}" Margin="0,20,0,0"
+                Height="48" FontSize="15"
+                Command="{Binding CobrarCommand}"
+                IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+      </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

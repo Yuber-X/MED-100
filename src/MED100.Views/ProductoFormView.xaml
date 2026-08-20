@@ -1,0 +1,93 @@
+<UserControl x:Class="MED100.Views.ProductoFormView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+    <Border Style="{DynamicResource Card}" MaxWidth="640" VerticalAlignment="Top"
+            HorizontalAlignment="Center" Padding="32" Margin="0,8">
+      <StackPanel>
+        <TextBlock Text="{Binding Titulo}" Style="{DynamicResource Texto.Titulo2}"
+                   Margin="0,0,0,20" />
+
+        <TextBlock Text="Nombre del producto" Style="{DynamicResource Input.Label}" />
+        <TextBox Style="{DynamicResource Input.Texto}"
+                 Text="{Binding Nombre, UpdateSourceTrigger=PropertyChanged}" />
+
+        <Grid Margin="0,14,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="Código de barras (opcional)" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding Codigo, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Escanéalo con la pistola o escríbelo. Puede quedar vacío." />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="Precio de venta" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding PrecioTexto, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Ej: 150.00" />
+          </StackPanel>
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="Cantidad en stock" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding CantidadTexto, UpdateSourceTrigger=PropertyChanged}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="Fecha de caducidad (opcional)" Style="{DynamicResource Input.Label}" />
+            <DatePicker Height="40" FontSize="13"
+                        SelectedDate="{Binding FechaCaducidad}" />
+          </StackPanel>
+        </Grid>
+
+        <!-- Qué clase de cosa es (pedido 2026-08-14): en una clínica el almacén
+             no es solo "insumos" — hay medicamentos que se dispensan, material
+             que se esteriliza, equipos y artículos de limpieza. -->
+        <TextBlock Text="Tipo" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+        <ComboBox Height="40" FontSize="13" HorizontalAlignment="Left" Width="260"
+                  ItemsSource="{Binding TiposProducto}"
+                  SelectedItem="{Binding TipoSeleccionado, Mode=TwoWay}"
+                  ItemTemplate="{DynamicResource Combo.Etiqueta}" />
+        <TextBlock TextWrapping="Wrap" Margin="2,6,0,0"
+                   Style="{DynamicResource Texto.Caption}"
+                   Foreground="{DynamicResource Brush.TextoTerciario}"
+                   Text="Insumo es lo que se consume con el paciente (gasa, jeringa). Medicamento es lo que se dispensa. Material es lo que se esteriliza y se vuelve a usar." />
+
+        <TextBlock Text="Descripción" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+        <TextBox Style="{DynamicResource Input.Texto}" Height="72"
+                 TextWrapping="Wrap" AcceptsReturn="True"
+                 VerticalContentAlignment="Top" Padding="10,8"
+                 Text="{Binding Descripcion, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="{Binding MensajeError}"
+                   Foreground="{DynamicResource Brush.Destructivo}"
+                   Style="{DynamicResource Texto.Caption}"
+                   TextWrapping="Wrap" Margin="0,12,0,0" />
+
+        <Grid Margin="0,20,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Button Grid.Column="0" Content="Cancelar" Style="{DynamicResource Boton.Secundario}"
+                  Command="{Binding CancelarCommand}" />
+          <Button Grid.Column="2" Content="Guardar producto" Style="{DynamicResource Boton.Primario}"
+                  Command="{Binding GuardarCommand}"
+                  IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+  </ScrollViewer>
+</UserControl>

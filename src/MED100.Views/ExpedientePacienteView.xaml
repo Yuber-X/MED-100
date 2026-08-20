@@ -1,0 +1,202 @@
+<UserControl x:Class="MED100.Views.ExpedientePacienteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ===================== EXPEDIENTE DE UN PACIENTE =====================
+       Los papeles que entregó. Se sube de a varios, se abre con la aplicación
+       de Windows que corresponda y se baja completo en un ZIP.
+
+       Los dos modos de ver —lista y cuadrícula— son los mismos que ya existen
+       en FAControl: la cuadrícula sirve cuando hay varias fotos del mismo
+       documento y el nombre no alcanza para distinguirlas. -->
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- ===== Barra superior ===== -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,14">
+      <Button DockPanel.Dock="Right" Content="Ver ficha completa"
+              Style="{DynamicResource Boton.Secundario}"
+              Command="{Binding VerFichaCommand}"
+              ToolTip="Sus citas, procedimientos, facturas y turnos" />
+      <Button Content="◀  Volver al almacén" HorizontalAlignment="Left"
+              Style="{DynamicResource Boton.Secundario}"
+              Command="{Binding VolverCommand}" />
+    </DockPanel>
+
+    <!-- ===== Quién es ===== -->
+    <Border Grid.Row="1" Style="{DynamicResource Card}" Padding="20,16" Margin="0,0,0,14">
+      <StackPanel>
+        <TextBlock Text="{Binding Nombre}" Style="{DynamicResource Texto.Titulo2}"
+                   TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <TextBlock Text="{Binding CedulaTexto}" Style="{DynamicResource Texto.Caption}"
+                     FontFamily="{DynamicResource Fuente.Mono}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+          <TextBlock Text="  ·  " Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}" />
+          <TextBlock Text="{Binding TelefonoTexto}" Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+          <TextBlock Text="  ·  " Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}" />
+          <TextBlock Text="{Binding EdadTexto}" Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+          <TextBlock Text="  ·  Referido por " Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}" />
+          <TextBlock Text="{Binding ReferidorTexto}" Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- ===== Los papeles ===== -->
+    <Border Grid.Row="2" Style="{DynamicResource Card}" Padding="20,16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <RadioButton Content="Lista" GroupName="VistaExpediente" Margin="0,0,10,0"
+                         VerticalAlignment="Center" FontSize="12"
+                         IsChecked="{Binding VistaLista, Mode=OneWay}"
+                         Command="{Binding VerEnListaCommand}" />
+            <RadioButton Content="Cuadrícula" GroupName="VistaExpediente" Margin="0,0,16,0"
+                         VerticalAlignment="Center" FontSize="12"
+                         IsChecked="{Binding VistaCuadricula, Mode=OneWay}"
+                         Command="{Binding VerEnCuadriculaCommand}" />
+            <Button Content="+ Subir archivos" Style="{DynamicResource Boton.Primario}"
+                    Click="SubirDocumentos_Click"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+            <Button Content="Descargar todo (ZIP)" Style="{DynamicResource Boton.Terciario}"
+                    Margin="6,0,0,0" Click="ExportarExpediente_Click" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Expediente del paciente" Style="{DynamicResource Texto.Titulo3}" />
+            <TextBlock Text="{Binding ResumenTexto}" Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoSecundario}" />
+          </StackPanel>
+        </DockPanel>
+
+        <!-- Con qué tipo entran los que se suban ahora: clasificarlos al subir
+             cuesta un clic; clasificarlos después no lo hace nadie. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,14,0,0">
+          <TextBlock Text="Subir como" VerticalAlignment="Center"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+          <ComboBox Width="220" Margin="10,0,0,0"
+                    ItemsSource="{Binding TiposDocumento}"
+                    SelectedItem="{Binding TipoParaSubir, Mode=TwoWay}"
+                    ItemTemplate="{DynamicResource Combo.Etiqueta}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2">
+          <TextBlock Text="{Binding Mensaje}" TextWrapping="Wrap" Margin="0,10,0,0">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Caption}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding EsError}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Destructivo}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+
+          <TextBlock Margin="0,10,0,0" TextWrapping="Wrap"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     Text="Arrancá subiendo la cédula y el carné de la ARS. Doble clic sobre un documento para abrirlo, guardarlo o administrarlo."
+                     Visibility="{Binding SinDocumentos, Converter={StaticResource BoolAVisibilidad}}" />
+        </StackPanel>
+
+        <!-- VISTA 1: lista -->
+        <DataGrid Grid.Row="3" Style="{DynamicResource Tabla}" ItemsSource="{Binding Documentos}"
+                  Margin="0,12,0,0"
+                  MouseDoubleClick="Documento_MouseDoubleClick"
+                  Visibility="{Binding VistaLista, Converter={StaticResource BoolAVisibilidad}}">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Documento" Binding="{Binding Nombre}" Width="*" MinWidth="260"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <DataGridTextColumn Header="Para qué es" Binding="{Binding TipoTexto}"
+                                Width="Auto" MinWidth="170"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <DataGridTextColumn Header="Formato" Binding="{Binding Familia}" Width="Auto" MinWidth="120"
+                                ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+            <DataGridTextColumn Header="Tamaño" Binding="{Binding TamanoTexto}" Width="Auto" MinWidth="110"
+                                ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+            <DataGridTextColumn Header="Fecha" Binding="{Binding FechaTexto}" Width="Auto" MinWidth="120"
+                                ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+            <DataGridTextColumn Header="Subió" Binding="{Binding SubidoPorTexto}"
+                                Width="Auto" MinWidth="160"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <DataGridTemplateColumn Header="" Width="120">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Button Content="Abrir…" Style="{DynamicResource Boton.Terciario}" FontSize="11"
+                          Tag="{Binding}" Click="AccionesDocumento_Click" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- VISTA 2: cuadrícula con el ícono del tipo -->
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                      Margin="0,12,0,0"
+                      Visibility="{Binding VistaCuadricula, Converter={StaticResource BoolAVisibilidad}}">
+          <ItemsControl ItemsSource="{Binding Documentos}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Width="140" Height="150" Margin="0,0,10,10" Cursor="Hand"
+                        Tag="{Binding}" Click="AccionesDocumento_Click"
+                        ToolTip="{Binding Nombre}">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="Marco" CornerRadius="10" Padding="10"
+                              Background="{DynamicResource Brush.FondoApp}"
+                              BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="1">
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Icono}" FontFamily="Segoe MDL2 Assets"
+                                     FontSize="34" HorizontalAlignment="Center"
+                                     Foreground="{DynamicResource Brush.Primario}" />
+                          <TextBlock Text="{Binding Nombre}" FontSize="11" Margin="0,10,0,0"
+                                     TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                                     MaxHeight="30"
+                                     Foreground="{DynamicResource Brush.TextoPrincipal}" />
+                          <TextBlock Text="{Binding TipoTexto}" FontSize="10" Margin="0,4,0,0"
+                                     TextAlignment="Center"
+                                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+                          <TextBlock Text="{Binding FechaTexto}" FontSize="10" Margin="0,2,0,0"
+                                     TextAlignment="Center"
+                                     Foreground="{DynamicResource Brush.TextoTerciario}" />
+                        </StackPanel>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Marco" Property="BorderBrush"
+                                  Value="{DynamicResource Brush.Primario}" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

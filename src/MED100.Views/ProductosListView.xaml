@@ -1,0 +1,99 @@
+<UserControl x:Class="MED100.Views.ProductosListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Toolbar -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,16">
+      <Button DockPanel.Dock="Right" Content="+ Nuevo producto"
+              Style="{DynamicResource Boton.Primario}"
+              Command="{Binding NuevoCommand}" />
+      <WrapPanel Orientation="Horizontal">
+        <TextBox Width="320"
+                 Style="{DynamicResource Input.Texto}"
+                 Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                 ToolTip="Buscar por nombre o código" />
+        <ComboBox Width="170" Height="40" FontSize="13" Margin="12,0,0,0"
+                  ItemsSource="{Binding Filtros}"
+                  SelectedItem="{Binding FiltroSeleccionado}" />
+      </WrapPanel>
+    </DockPanel>
+
+    <!-- Tabla -->
+    <Border Grid.Row="1" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Filas}">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Código" Binding="{Binding CodigoTexto}" Width="Auto" MinWidth="130">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource Fuente.Mono}" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*" MinWidth="180"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <!-- Qué clase de cosa es: en una clínica el almacén no es solo insumos -->
+          <DataGridTextColumn Header="Tipo" Binding="{Binding TipoTexto}" Width="Auto" MinWidth="130" />
+          <DataGridTextColumn Header="Precio"
+                              Binding="{Binding Precio, Converter={StaticResource Money}}"
+                              Width="Auto" MinWidth="130">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Stock" Binding="{Binding Cantidad}" Width="Auto" MinWidth="90">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Caducidad" Binding="{Binding CaducidadTexto}" Width="Auto" MinWidth="110">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTemplateColumn Header="Estado" Width="110"
+                                  HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Border Style="{DynamicResource Pill.Caducidad}" HorizontalAlignment="Left">
+                  <TextBlock Style="{DynamicResource Pill.Caducidad.Texto}"
+                             Text="{Binding SemaforoTexto}" />
+                </Border>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Width="210">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <Button Content="Editar" Style="{DynamicResource Boton.Terciario}"
+                          Command="{Binding DataContext.EditarCommand,
+                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                          CommandParameter="{Binding}" />
+                  <Button Content="Eliminar" Style="{DynamicResource Boton.Terciario}"
+                          Foreground="{DynamicResource Brush.Destructivo}" Margin="8,0,0,0"
+                          Command="{Binding DataContext.EliminarCommand,
+                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                          CommandParameter="{Binding}" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <TextBlock Grid.Row="2" Text="{Binding ContadorTexto}"
+               Style="{DynamicResource Texto.Caption}" Margin="4,10,0,0" />
+  </Grid>
+</UserControl>

@@ -1,0 +1,46 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Marca principal (Indigo) — DESIGN.md §3 -->
+  <Color x:Key="Color.Indigo600">#4F46E5</Color>
+  <Color x:Key="Color.Indigo700">#312B94</Color>
+  <Color x:Key="Color.Indigo100">#E0E4FD</Color>
+  <Color x:Key="Color.Indigo50">#EEF0FE</Color>
+
+  <SolidColorBrush x:Key="Brush.Primario" Color="{StaticResource Color.Indigo600}" />
+  <SolidColorBrush x:Key="Brush.PrimarioHover" Color="{StaticResource Color.Indigo700}" />
+  <SolidColorBrush x:Key="Brush.PrimarioSuave" Color="{StaticResource Color.Indigo100}" />
+  <SolidColorBrush x:Key="Brush.PrimarioSutil" Color="{StaticResource Color.Indigo50}" />
+
+  <!-- Neutros -->
+  <SolidColorBrush x:Key="Brush.FondoApp" Color="#FAFAF9" />
+  <SolidColorBrush x:Key="Brush.FondoCard" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="Brush.BordeSutil" Color="#E5E5E4" />
+  <SolidColorBrush x:Key="Brush.BordeEstandar" Color="#D4D4D3" />
+  <SolidColorBrush x:Key="Brush.TextoPrincipal" Color="#1A1A1A" />
+  <SolidColorBrush x:Key="Brush.TextoSecundario" Color="#555553" />
+  <SolidColorBrush x:Key="Brush.TextoTerciario" Color="#888780" />
+  <SolidColorBrush x:Key="Brush.TextoDeshabilitado" Color="#B8B8B4" />
+  <SolidColorBrush x:Key="Brush.FondoEncabezadoTabla" Color="#F4F4F2" />
+
+  <!-- Semántica financiera (semáforo de cobros) -->
+  <SolidColorBrush x:Key="Brush.AlDia.Texto" Color="#065F46" />
+  <SolidColorBrush x:Key="Brush.AlDia.Fondo" Color="#D1FAE5" />
+  <SolidColorBrush x:Key="Brush.PorVencer.Texto" Color="#854F0B" />
+  <SolidColorBrush x:Key="Brush.PorVencer.Fondo" Color="#FEF3C7" />
+  <SolidColorBrush x:Key="Brush.Vencido.Texto" Color="#9A3412" />
+  <SolidColorBrush x:Key="Brush.Vencido.Fondo" Color="#FED7AA" />
+  <SolidColorBrush x:Key="Brush.EnMora.Texto" Color="#991B1B" />
+  <SolidColorBrush x:Key="Brush.EnMora.Fondo" Color="#FEE2E2" />
+  <SolidColorBrush x:Key="Brush.Pagado.Texto" Color="#1E40AF" />
+  <SolidColorBrush x:Key="Brush.Pagado.Fondo" Color="#DBEAFE" />
+  <SolidColorBrush x:Key="Brush.Cancelado.Texto" Color="#404040" />
+  <SolidColorBrush x:Key="Brush.Cancelado.Fondo" Color="#E5E5E4" />
+
+  <!-- Acciones destructivas y deltas -->
+  <SolidColorBrush x:Key="Brush.Destructivo" Color="#DC2626" />
+  <SolidColorBrush x:Key="Brush.DeltaPositivo" Color="#059669" />
+  <SolidColorBrush x:Key="Brush.DeltaNegativo" Color="#DC2626" />
+  <SolidColorBrush x:Key="Brush.NumeroNegativo" Color="#991B1B" />
+
+</ResourceDictionary>

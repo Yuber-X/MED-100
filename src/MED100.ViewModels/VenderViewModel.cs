@@ -1,0 +1,477 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using MED100.Common;
+using MED100.Models;
+using MED100.Services;
+using Serilog;
+
+namespace MED100.ViewModels;
+
+/// <summary>
+/// Un resultado del buscador: puede ser un PROCEDIMIENTO del tarifario o un
+/// INSUMO del inventario. Se unifican en una sola lista porque la recepción
+/// escribe "consulta" o "gasa" sin pensar en qué tabla vive cada cosa.
+/// </summary>
+public record ResultadoCobro(
+    long Id, string Nombre, decimal Precio, bool EsProcedimiento, bool Exento, int Stock)
+{
+    /// <summary>Lo que va debajo del nombre: stock si es insumo, "servicio" si no.</summary>
+    public string DetalleTexto => EsProcedimiento
+        ? (Exento ? "Procedimiento · exento" : "Procedimiento · gravado")
+        : $"Insumo · quedan {Stock}";
+}
+
+/// <summary>Línea del carrito en pantalla. La cantidad se ajusta con +/−.</summary>
+public partial class CarritoLinea : ObservableObject
+{
+    /// <summary>Uno de los dos va con valor, nunca los dos ni ninguno.</summary>
+    public long? ProductoId { get; init; }
+    public long? ProcedimientoId { get; init; }
+    public required string Nombre { get; init; }
+    public required decimal Precio { get; init; }
+    /// <summary>Solo tiene sentido en insumos. Un procedimiento no sale de un estante.</summary>
+    public required int StockDisponible { get; init; }
+    public required bool Exento { get; init; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Subtotal))]
+    private int _cantidad = 1;
+
+    public decimal Subtotal => Cantidad * Precio;
+    public bool EsProcedimiento => ProcedimientoId is not null;
+    public string TipoTexto => EsProcedimiento ? "Procedimiento" : "Insumo";
+}
+
+/// <summary>
+/// Pantalla de cobro de la clínica.
+///
+/// Lo que la separa de un POS común:
+///  - una línea puede ser un PROCEDIMIENTO (exento de ITBIS) o un INSUMO;
+///  - hay un MÉDICO, y de sus procedimientos sale su honorario;
+///  - puede haber una ARS que cubra parte, y lo que cubre NO entra a la caja.
+///
+/// Los cálculos los hacen VentaService y CalculosClinica — este VM orquesta.
+/// </summary>
+public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
+{
+    private static readonly CultureInfo CulturaDo = CultureInfo.GetCultureInfo("es-DO");
+
+    private readonly VentaService _ventas;
+    private readonly ProductoService _productos;
+    private readonly ProcedimientoService _procedimientos;
+    private readonly ClienteService _clientes;
+    private readonly MedicoService _medicos;
+    private readonly ArsService _ars;
+    private readonly ConfiguracionNegocioService _config;
+    private readonly IDialogService _dialogos;
+
+    private IReadOnlyList<Producto> _catalogoInsumos = [];
+    private IReadOnlyList<Procedimiento> _catalogoProcedimientos = [];
+
+    /// <summary>Cita que se está cobrando, si el cobro llegó desde la agenda.</summary>
+    private long? _citaId;
+
+    /// <summary>La App abre el TicketWindow al registrarse una venta.</summary>
+    public event Action<VentaResultado>? VentaRegistrada;
+
+    public VenderViewModel(VentaService ventas, ProductoService productos,
+        ProcedimientoService procedimientos, ClienteService clientes, MedicoService medicos,
+        ArsService ars, ConfiguracionNegocioService config, IDialogService dialogos)
+    {
+        _ventas = ventas;
+        _productos = productos;
+        _procedimientos = procedimientos;
+        _clientes = clientes;
+        _medicos = medicos;
+        _ars = ars;
+        _config = config;
+        _dialogos = dialogos;
+
+        MetodosPago =
+        [
+            new Opcion<MetodoPagoFactura>(MetodoPagoFactura.Efectivo, "Efectivo"),
+            new Opcion<MetodoPagoFactura>(MetodoPagoFactura.Tarjeta, "Tarjeta"),
+            new Opcion<MetodoPagoFactura>(MetodoPagoFactura.Transferencia, "Transferencia"),
+            new Opcion<MetodoPagoFactura>(MetodoPagoFactura.Mixto, "Mixto")
+        ];
+        _metodoSeleccionado = MetodosPago[0];
+    }
+
+    public ObservableCollection<ResultadoCobro> Resultados { get; } = [];
+    public ObservableCollection<CarritoLinea> Carrito { get; } = [];
+    public ObservableCollection<Opcion<long?>> Clientes { get; } = [];
+    public ObservableCollection<Opcion<long?>> Medicos { get; } = [];
+    public ObservableCollection<Opcion<long?>> Aseguradoras { get; } = [];
+    public IReadOnlyList<Opcion<MetodoPagoFactura>> MetodosPago { get; }
+
+    [ObservableProperty] private string _textoBusqueda = string.Empty;
+    [ObservableProperty] private Opcion<long?>? _clienteSeleccionado;
+    [ObservableProperty] private Opcion<long?>? _medicoSeleccionado;
+    [ObservableProperty] private Opcion<long?>? _arsSeleccionada;
+    [ObservableProperty] private string _arsAutorizacion = string.Empty;
+    [ObservableProperty] private string _arsCubiertoTexto = string.Empty;
+    [ObservableProperty] private string _ncf = string.Empty;
+    [ObservableProperty] private Opcion<MetodoPagoFactura> _metodoSeleccionado;
+    [ObservableProperty] private string _efectivoTexto = string.Empty;
+    [ObservableProperty] private bool _mostrarCliente = true;
+    [ObservableProperty] private bool _mostrarArs = true;
+    [ObservableProperty] private decimal _subtotal;
+    [ObservableProperty] private decimal _itbis;
+    [ObservableProperty] private decimal _total;
+    [ObservableProperty] private decimal _pacientePaga;
+    [ObservableProperty] private string _itbisEtiqueta = "ITBIS";
+    [ObservableProperty] private string _cambioTexto = "—";
+    [ObservableProperty] private string _avisoCita = string.Empty;
+    [ObservableProperty] private bool _ocupado;
+
+    public bool PideEfectivo =>
+        MetodoSeleccionado.Valor is MetodoPagoFactura.Efectivo or MetodoPagoFactura.Mixto;
+
+    /// <summary>Solo se muestra la línea del ITBIS si de verdad hay impuesto que cobrar.</summary>
+    public bool HayItbis => Itbis > 0m;
+
+    /// <summary>Hay seguro elegido: aparece el desglose de quién paga qué.</summary>
+    public bool HayArs => ArsSeleccionada?.Valor is not null;
+
+    /// <summary>El médico es obligatorio si hay procedimientos en el carrito.</summary>
+    public bool MedicoObligatorio => Carrito.Any(l => l.EsProcedimiento);
+
+    public bool HayCitaEnCobro => _citaId is not null;
+
+    partial void OnTextoBusquedaChanged(string value) => Buscar();
+    partial void OnEfectivoTextoChanged(string value) => ActualizarCambio();
+    partial void OnArsCubiertoTextoChanged(string value) => Recalcular();
+
+    partial void OnArsSeleccionadaChanged(Opcion<long?>? value)
+    {
+        OnPropertyChanged(nameof(HayArs));
+        if (value?.Valor is null)
+        {
+            ArsAutorizacion = string.Empty;
+            ArsCubiertoTexto = string.Empty;
+        }
+        Recalcular();
+    }
+
+    partial void OnMetodoSeleccionadoChanged(Opcion<MetodoPagoFactura> value)
+    {
+        OnPropertyChanged(nameof(PideEfectivo));
+        ActualizarCambio();
+    }
+
+    public async Task RefrescarAsync()
+    {
+        try
+        {
+            var cfg = _config.Actual;
+            MostrarCliente = cfg.MostrarClienteEnVenta;
+            MostrarArs = cfg.ArsActivo;
+            ItbisEtiqueta = $"ITBIS ({cfg.ItbisTasa:0.##}%)";
+
+            _catalogoInsumos = await _productos.ObtenerTodosAsync();
+            _catalogoProcedimientos = await _procedimientos.ObtenerActivosAsync();
+
+            if (MostrarCliente)
+            {
+                var lista = await _clientes.ObtenerTodosAsync();
+                Clientes.Clear();
+                Clientes.Add(new Opcion<long?>(null, "Consumidor final"));
+                foreach (var c in lista)
+                    Clientes.Add(new Opcion<long?>(c.Id, c.Nombre));
+                ClienteSeleccionado ??= Clientes[0];
+            }
+
+            var medicoPrevio = MedicoSeleccionado?.Valor;
+            Medicos.Clear();
+            Medicos.Add(new Opcion<long?>(null, "Sin médico"));
+            foreach (var m in await _medicos.ObtenerActivosAsync())
+                Medicos.Add(new Opcion<long?>(m.Id, m.Nombre));
+            MedicoSeleccionado = Medicos.FirstOrDefault(m => m.Valor == medicoPrevio) ?? Medicos[0];
+
+            if (MostrarArs)
+            {
+                var arsPrevia = ArsSeleccionada?.Valor;
+                Aseguradoras.Clear();
+                Aseguradoras.Add(new Opcion<long?>(null, "Paciente privado"));
+                foreach (var a in await _ars.ObtenerActivasAsync())
+                    Aseguradoras.Add(new Opcion<long?>(a.Id, a.Nombre));
+                ArsSeleccionada = Aseguradoras.FirstOrDefault(a => a.Valor == arsPrevia) ?? Aseguradoras[0];
+            }
+
+            Recalcular();   // por si cambió la tasa o la exención desde Configuración
+            Buscar();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error cargando la pantalla de cobro");
+            _dialogos.MostrarError("Cobrar", $"No se pudo cargar el catálogo.\n\n{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Prepara el cobro de una cita: paciente, médico y procedimiento ya puestos.
+    /// Es el camino corto de la agenda a la caja.
+    /// </summary>
+    public async Task PrepararDesdeCitaAsync(Cita cita)
+    {
+        await RefrescarAsync();
+
+        Carrito.Clear();
+        _citaId = cita.Id;
+        ClienteSeleccionado = Clientes.FirstOrDefault(c => c.Valor == cita.ClienteId)
+                              ?? Clientes.FirstOrDefault();
+        MedicoSeleccionado = Medicos.FirstOrDefault(m => m.Valor == cita.MedicoId)
+                             ?? Medicos.FirstOrDefault();
+
+        if (cita.ProcedimientoId is { } procedimientoId)
+        {
+            var procedimiento = _catalogoProcedimientos.FirstOrDefault(p => p.Id == procedimientoId);
+            if (procedimiento is not null)
+                Agregar(DeProcedimiento(procedimiento));
+        }
+
+        AvisoCita = $"Cobrando la cita de {cita.PacienteNombre} con {cita.MedicoNombre}.";
+        OnPropertyChanged(nameof(HayCitaEnCobro));
+        Recalcular();
+    }
+
+    private static ResultadoCobro DeProcedimiento(Procedimiento p) =>
+        new(p.Id, p.Nombre, p.Precio, EsProcedimiento: true, p.ExentoItbis, Stock: int.MaxValue);
+
+    private static ResultadoCobro DeInsumo(Producto p) =>
+        // Los insumos NO son servicio de salud: llevan ITBIS si el negocio lo
+        // tiene activo. La exención por producto la decide el contador y hoy
+        // no se edita desde acá.
+        new(p.Id, p.Nombre, p.Precio, EsProcedimiento: false, Exento: false, p.Cantidad);
+
+    private void Buscar()
+    {
+        var filtro = TextoBusqueda.Trim();
+        Resultados.Clear();
+        if (string.IsNullOrEmpty(filtro))
+            return;
+
+        // Código exacto primero (pistola de código de barras)
+        var exacto = _catalogoInsumos.FirstOrDefault(p =>
+            string.Equals(p.Codigo, filtro, StringComparison.OrdinalIgnoreCase));
+        if (exacto is not null)
+        {
+            Agregar(DeInsumo(exacto));
+            TextoBusqueda = string.Empty;   // listo para el próximo escaneo
+            return;
+        }
+
+        // Procedimientos primero: en una clínica es lo que más se cobra.
+        foreach (var p in _catalogoProcedimientos
+                     .Where(p => p.Nombre.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
+                                 (p.Codigo?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false))
+                     .Take(6))
+            Resultados.Add(DeProcedimiento(p));
+
+        foreach (var p in _catalogoInsumos
+                     .Where(p => p.Nombre.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
+                                 (p.Codigo?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false))
+                     .Take(6))
+            Resultados.Add(DeInsumo(p));
+    }
+
+    [RelayCommand]
+    private void Agregar(ResultadoCobro? fila)
+    {
+        if (fila is null)
+            return;
+
+        var existente = fila.EsProcedimiento
+            ? Carrito.FirstOrDefault(l => l.ProcedimientoId == fila.Id)
+            : Carrito.FirstOrDefault(l => l.ProductoId == fila.Id);
+
+        // El stock solo frena a los insumos: de un procedimiento se pueden
+        // cobrar tres sesiones sin que haya nada que descontar.
+        if (!fila.EsProcedimiento)
+        {
+            var enCarrito = existente?.Cantidad ?? 0;
+            if (enCarrito + 1 > fila.Stock)
+            {
+                _dialogos.MostrarError("Stock",
+                    $"Solo quedan {fila.Stock} unidades de {fila.Nombre}.");
+                return;
+            }
+        }
+
+        if (existente is not null)
+        {
+            existente.Cantidad++;
+        }
+        else
+        {
+            Carrito.Add(new CarritoLinea
+            {
+                ProductoId = fila.EsProcedimiento ? null : fila.Id,
+                ProcedimientoId = fila.EsProcedimiento ? fila.Id : null,
+                Nombre = fila.Nombre,
+                Precio = fila.Precio,
+                StockDisponible = fila.Stock,
+                Exento = fila.Exento
+            });
+        }
+        Recalcular();
+    }
+
+    [RelayCommand]
+    private void Mas(CarritoLinea? linea)
+    {
+        if (linea is null) return;
+        if (!linea.EsProcedimiento && linea.Cantidad + 1 > linea.StockDisponible)
+        {
+            _dialogos.MostrarError("Stock", $"Solo quedan {linea.StockDisponible} unidades de {linea.Nombre}.");
+            return;
+        }
+        linea.Cantidad++;
+        Recalcular();
+    }
+
+    [RelayCommand]
+    private void Menos(CarritoLinea? linea)
+    {
+        if (linea is null) return;
+        if (linea.Cantidad <= 1)
+            Carrito.Remove(linea);
+        else
+            linea.Cantidad--;
+        Recalcular();
+    }
+
+    [RelayCommand]
+    private void Quitar(CarritoLinea? linea)
+    {
+        if (linea is null) return;
+        Carrito.Remove(linea);
+        Recalcular();
+    }
+
+    private void Recalcular()
+    {
+        var cfg = _config.Actual;
+        var totales = CalculosClinica.CalcularTotales(
+            LineasActuales(), cfg.ItbisTasaEfectiva, cfg.Redondeo);
+
+        Subtotal = totales.Subtotal;
+        Itbis = totales.Itbis;
+        Total = totales.Total;
+
+        var reparto = CalculosClinica.CalcularReparto(totales.Total,
+            ArsSeleccionada?.Valor, null, null, LeerCubierto());
+        PacientePaga = reparto.PacientePaga;
+
+        OnPropertyChanged(nameof(HayItbis));
+        OnPropertyChanged(nameof(MedicoObligatorio));
+        ActualizarCambio();
+    }
+
+    private decimal LeerCubierto() =>
+        decimal.TryParse(ArsCubiertoTexto, NumberStyles.Number, CulturaDo, out var monto) && monto > 0m
+            ? monto
+            : 0m;
+
+    private void ActualizarCambio()
+    {
+        // Se compara contra lo que paga el PACIENTE, no contra el total: con
+        // seguro de por medio son dos números distintos y el que se recibe en
+        // el mostrador es el del paciente.
+        if (MetodoSeleccionado.Valor == MetodoPagoFactura.Efectivo &&
+            decimal.TryParse(EfectivoTexto, NumberStyles.Number, CulturaDo, out var efectivo) &&
+            efectivo >= PacientePaga && PacientePaga > 0)
+        {
+            CambioTexto = VentaService.CalcularCambio(efectivo, PacientePaga).ToString("N2", CulturaDo);
+        }
+        else
+        {
+            CambioTexto = "—";
+        }
+    }
+
+    private List<VentaLinea> LineasActuales() =>
+        [.. Carrito.Select(l => new VentaLinea(
+            l.ProductoId, l.Nombre, l.Cantidad, l.Precio, l.Exento, l.ProcedimientoId))];
+
+    [RelayCommand]
+    private async Task CobrarAsync()
+    {
+        if (Carrito.Count == 0)
+        {
+            _dialogos.MostrarError("Cobrar", "No hay nada que cobrar.");
+            return;
+        }
+
+        decimal? efectivo = null;
+        if (PideEfectivo)
+        {
+            if (!decimal.TryParse(EfectivoTexto, NumberStyles.Number, CulturaDo, out var monto))
+            {
+                _dialogos.MostrarError("Cobrar", "Indicá el efectivo recibido (ej: 500.00).");
+                return;
+            }
+            efectivo = monto;
+        }
+
+        var solicitud = new VentaSolicitud(LineasActuales(),
+            MostrarCliente ? ClienteSeleccionado?.Valor : null,
+            MetodoSeleccionado.Valor, efectivo,
+            MedicoSeleccionado?.Valor,
+            MostrarArs ? ArsSeleccionada?.Valor : null,
+            string.IsNullOrWhiteSpace(ArsAutorizacion) ? null : ArsAutorizacion.Trim(),
+            MostrarArs ? LeerCubierto() : 0m,
+            string.IsNullOrWhiteSpace(Ncf) ? null : Ncf.Trim(),
+            _citaId);
+
+        try
+        {
+            Ocupado = true;
+            var resultado = await _ventas.RegistrarVentaAsync(solicitud);
+
+            LimpiarParaElSiguiente();
+            await RefrescarAsync();   // stock actualizado para el próximo cobro
+
+            VentaRegistrada?.Invoke(resultado);
+        }
+        catch (ArgumentException ex)
+        {
+            _dialogos.MostrarError("Cobrar", ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Stock insuficiente u otra regla: el cobro se revirtió completo
+            _dialogos.MostrarError("Cobrar", ex.Message);
+            await RefrescarAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error registrando el cobro");
+            _dialogos.MostrarError("Cobrar", $"No se pudo registrar el cobro.\n\n{ex.Message}");
+        }
+        finally
+        {
+            Ocupado = false;
+        }
+    }
+
+    private void LimpiarParaElSiguiente()
+    {
+        Carrito.Clear();
+        EfectivoTexto = string.Empty;
+        TextoBusqueda = string.Empty;
+        ArsAutorizacion = string.Empty;
+        ArsCubiertoTexto = string.Empty;
+        // El NCF NO se arrastra al próximo cobro: es único por comprobante y
+        // repetirlo haría fallar la restricción con un error incomprensible.
+        Ncf = string.Empty;
+        AvisoCita = string.Empty;
+        _citaId = null;
+        ClienteSeleccionado = Clientes.FirstOrDefault();
+        ArsSeleccionada = Aseguradoras.FirstOrDefault();
+        OnPropertyChanged(nameof(HayCitaEnCobro));
+        Recalcular();
+    }
+}

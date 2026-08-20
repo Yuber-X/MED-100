@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MED100.Models\MED100.Models.csproj" />
+    <ProjectReference Include="..\MED100.Common\MED100.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Esquema embebido para el auto-aprovisionamiento del primer arranque.
+         Única fuente de verdad: el mismo archivo de scripts/db/. -->
+    <EmbeddedResource Include="..\..\scripts\db\001_create_schema.sql"
+                      Link="001_create_schema.sql"
+                      LogicalName="MED100.Data.001_create_schema.sql" />
+    <!-- El seed de roles/permisos es OBLIGATORIO para operar: también se embebe -->
+    <EmbeddedResource Include="..\..\scripts\db\002_seed_data.sql"
+                      Link="002_seed_data.sql"
+                      LogicalName="MED100.Data.002_seed_data.sql" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MED100.Data.Tests" />
+  </ItemGroup>
+
+</Project>

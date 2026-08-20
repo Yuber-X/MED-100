@@ -1,0 +1,387 @@
+<UserControl x:Class="MED100.Views.MedicosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid Margin="0">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="16" />
+      <ColumnDefinition Width="400" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- Encabezado: buscador + cuántos atienden ahora + Nuevo -->
+    <DockPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
+      <Button DockPanel.Dock="Right" Content="Nuevo médico"
+              Style="{DynamicResource Boton.Primario}"
+              Command="{Binding NuevoCommand}" />
+      <StackPanel>
+        <TextBox Style="{DynamicResource Input.Texto}" Width="280" HorizontalAlignment="Left"
+                 Text="{Binding Busqueda, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
+        <TextBlock Text="{Binding ResumenAhora}" Style="{DynamicResource Texto.Caption}"
+                   Foreground="{DynamicResource Brush.TextoSecundario}" Margin="2,6,0,0" />
+      </StackPanel>
+    </DockPanel>
+
+    <!-- Lista de médicos. La columna de estado es lo primero que se mira. -->
+    <Border Grid.Row="1" Grid.Column="0" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid ItemsSource="{Binding Medicos}"
+                SelectedItem="{Binding MedicoSeleccionado}"
+                Style="{DynamicResource Tabla}"
+                AutoGenerateColumns="False" IsReadOnly="True"
+                HeadersVisibility="Column" GridLinesVisibility="None">
+        <DataGrid.Columns>
+          <!-- Sin ElementStyle: el estilo "Tabla" ya aplica Tabla.Celda como
+               CellStyle. Pasarlo acá reventaba, porque ElementStyle apunta al
+               TextBlock de adentro y Tabla.Celda es TargetType="DataGridCell". -->
+          <!-- MinWidth en la columna estrella: sin él la tabla nunca desborda,
+               la columna se aprieta y los nombres largos se cortan. Con el
+               mínimo puesto aparece el scroll horizontal, que es lo que hay que
+               tener cuando las columnas no caben. -->
+          <DataGridTextColumn Header="Médico" Binding="{Binding Nombre}" Width="*" MinWidth="180" />
+          <DataGridTextColumn Header="Especialidad" Binding="{Binding Especialidad}" Width="Auto" MinWidth="150"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <!-- Los días fijos: la pregunta más frecuente del mostrador -->
+          <DataGridTextColumn Header="Días" Binding="{Binding DiasTexto}" Width="Auto" MinWidth="150"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <DataGridTextColumn Header="Turno" Binding="{Binding CodigoTurnoTexto}" Width="Auto" MinWidth="70" />
+          <DataGridTextColumn Header="Honorario" Binding="{Binding HonorarioTexto}" Width="Auto" MinWidth="90" />
+          <!-- Verde = está atendiendo. Es la información de la recepción. -->
+          <DataGridTemplateColumn Header="Ahora" Width="190">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Border CornerRadius="6" Padding="8,3" HorizontalAlignment="Left">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Setter Property="Background" Value="{DynamicResource Brush.Cancelado.Fondo}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding AtiendeAhora}" Value="True">
+                          <Setter Property="Background" Value="{DynamicResource Brush.AlDia.Fondo}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                  <TextBlock Text="{Binding EstadoTexto}" FontSize="12">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.Cancelado.Texto}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding AtiendeAhora}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.AlDia.Texto}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </Border>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Panel derecho: formulario del médico O sus horarios -->
+    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+            Style="{DynamicResource Card}" Padding="20,20,8,20">
+      <Grid>
+
+        <!-- ===== Formulario (alta / edición) ===== -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                      Visibility="{Binding Editando, Converter={StaticResource BoolAVisibilidad}}">
+          <StackPanel>
+            <TextBlock Text="Datos del médico" Style="{DynamicResource Texto.Titulo3}" Margin="0,0,0,14" />
+
+            <TextBlock Text="Nombre" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding Nombre, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Text="Especialidad" Style="{DynamicResource Input.Label}" Margin="0,12,0,6" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding Especialidad, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Cédula" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding Cedula, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <!-- "Exequátur" es el número con que el Poder Ejecutivo habilita
+                     a ejercer en RD; sin él el médico no puede facturar
+                     honorarios. Va impreso en la factura, por eso se pide. -->
+                <TextBlock Text="Exequátur" Style="{DynamicResource Input.Label}"
+                           ToolTipService.ShowDuration="20000"
+                           ToolTip="Número que habilita al médico a ejercer en el país. Se lo da el Poder Ejecutivo y va impreso en la factura." />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         ToolTip="Número que habilita al médico a ejercer en el país. Se lo da el Poder Ejecutivo y va impreso en la factura."
+                         ToolTipService.ShowDuration="20000"
+                         Text="{Binding Exequatur, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Teléfono" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding Telefono, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Honorario (%)" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding HonorarioTexto, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="110" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Correo" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Código de turno" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding CodigoTurno, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Dos letras con las que salen sus turnos en la sala (YO-1, YO-2). Dejalo vacío y se calcula solo con la primera letra del nombre y la última del apellido." />
+              </StackPanel>
+            </Grid>
+            <TextBlock TextWrapping="Wrap" Margin="2,4,0,0"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       Text="El código de turno se calcula solo si lo dejás vacío: primera letra del nombre y última del apellido («Yuber Santana Lizardo» → YO)." />
+
+            <!-- ===== Días fijos =====
+                 El combo de abajo (en la ficha) sigue estando para el caso
+                 suelto: el médico que un sábado puntual sí viene. Esto de acá
+                 es lo otro, los días en que SIEMPRE atiende. -->
+            <TextBlock Text="Días que atiende" Style="{DynamicResource Input.Label}" Margin="0,18,0,6" />
+            <ItemsControl ItemsSource="{Binding DiasFijos}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox Style="{DynamicResource Chip.Dia}"
+                            Content="{Binding Corto}"
+                            ToolTip="{Binding Nombre}"
+                            IsChecked="{Binding Marcado, Mode=TwoWay}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Hora de 12 con AM/PM: en RD nadie dice "las 17:00" (pedido de
+                 Yuber 2026-08-14). El combo es angosto a propósito, solo tiene
+                 dos opciones. -->
+            <Grid Margin="0,6,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Entra" Style="{DynamicResource Input.Label}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="72" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                           Text="{Binding HoraFijaInicioTexto, UpdateSourceTrigger=PropertyChanged}" />
+                  <ComboBox Grid.Column="2" ItemsSource="{Binding Meridianos}"
+                            SelectedItem="{Binding HoraFijaInicioMeridiano, Mode=TwoWay}" />
+                </Grid>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Sale" Style="{DynamicResource Input.Label}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="72" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                           Text="{Binding HoraFijaFinTexto, UpdateSourceTrigger=PropertyChanged}" />
+                  <ComboBox Grid.Column="2" ItemsSource="{Binding Meridianos}"
+                            SelectedItem="{Binding HoraFijaFinMeridiano, Mode=TwoWay}" />
+                </Grid>
+              </StackPanel>
+            </Grid>
+            <TextBlock TextWrapping="Wrap" Margin="2,6,0,0"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       Text="Este horario se usa solo para los días que se marcan por primera vez. Los días que ya tienen tramos cargados (mañana y tarde) quedan como están; destildar un día le borra todos sus tramos." />
+
+            <CheckBox Content="Activo (aparece para agendar y cobrar)" Margin="0,16,0,0"
+                      IsChecked="{Binding Activo}" />
+
+            <TextBlock Text="{Binding MensajeError}" TextWrapping="Wrap" Margin="0,12,0,0"
+                       Foreground="{DynamicResource Brush.Destructivo}"
+                       Style="{DynamicResource Texto.Caption}" />
+
+            <Grid Margin="0,18,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Button Grid.Column="0" Content="Cancelar" Style="{DynamicResource Boton.Secundario}"
+                      Command="{Binding CancelarCommand}" />
+              <Button Grid.Column="2" Content="Guardar" Style="{DynamicResource Boton.Primario}"
+                      Command="{Binding GuardarCommand}" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- ===== Ficha + horarios (cuando no se está editando) ===== -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                      Visibility="{Binding Editando, Converter={StaticResource InversorBoolVisibilidad}}">
+          <StackPanel>
+
+            <!-- Sin selección: instrucción, no una tarjeta vacía -->
+            <TextBlock Text="Elegí un médico de la lista para ver y editar sus horarios."
+                       TextWrapping="Wrap" Style="{DynamicResource Texto.Cuerpo}"
+                       Foreground="{DynamicResource Brush.TextoSecundario}"
+                       Visibility="{Binding HayMedicoSeleccionado,
+                                    Converter={StaticResource InversorBoolVisibilidad}}" />
+
+            <StackPanel Visibility="{Binding HayMedicoSeleccionado,
+                                     Converter={StaticResource BoolAVisibilidad}}">
+              <TextBlock Text="{Binding MedicoSeleccionado.Nombre}"
+                         Style="{DynamicResource Texto.Titulo3}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding MedicoSeleccionado.EstadoTexto}"
+                         Style="{DynamicResource Texto.Caption}"
+                         Foreground="{DynamicResource Brush.TextoSecundario}" Margin="0,2,0,0" />
+
+              <!-- Los días fijos y el prefijo del turno, arriba de todo: es lo
+                   que se consulta cuando alguien llama preguntando cuándo viene -->
+              <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Border Background="{DynamicResource Brush.PrimarioSutil}" CornerRadius="6"
+                        Padding="9,4" Margin="0,0,8,0">
+                  <TextBlock Text="{Binding MedicoSeleccionado.DiasTexto}" FontSize="12"
+                             Foreground="{DynamicResource Brush.Primario}" />
+                </Border>
+                <Border Background="{DynamicResource Brush.FondoEncabezadoTabla}" CornerRadius="6"
+                        Padding="9,4" ToolTip="Prefijo con que salen sus turnos en la sala">
+                  <TextBlock Text="{Binding MedicoSeleccionado.CodigoTurnoTexto}" FontSize="12"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource Brush.TextoSecundario}" />
+                </Border>
+              </StackPanel>
+
+              <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="10" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="Editar" Style="{DynamicResource Boton.Secundario}"
+                        Command="{Binding EditarCommand}" />
+                <Button Grid.Column="2" Content="Eliminar" Style="{DynamicResource Boton.Destructivo}"
+                        Command="{Binding EliminarCommand}" />
+              </Grid>
+
+              <Separator Margin="0,18,0,14" />
+
+              <TextBlock Text="HORARIOS DE ATENCIÓN" Style="{DynamicResource Texto.MicroLabel}" />
+              <TextBlock TextWrapping="Wrap" Margin="0,4,0,10"
+                         Style="{DynamicResource Texto.Caption}"
+                         Foreground="{DynamicResource Brush.TextoTerciario}"
+                         Text="Mañana y tarde se cargan como dos tramos del mismo día: así queda el corte del almuerzo." />
+
+              <ItemsControl ItemsSource="{Binding Horarios}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Background="{DynamicResource Brush.FondoEncabezadoTabla}"
+                            CornerRadius="8" Padding="10,7" Margin="0,0,0,6">
+                      <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="✕" Width="26" Padding="0"
+                                Style="{DynamicResource Boton.Terciario}"
+                                Command="{Binding DataContext.QuitarHorarioCommand,
+                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}" />
+                        <TextBlock Text="{Binding DiaTexto}" FontWeight="SemiBold" Width="90"
+                                   Style="{DynamicResource Texto.Cuerpo}" />
+                        <TextBlock Text="{Binding RangoTexto}" Style="{DynamicResource Texto.Cuerpo}" />
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <!-- Alta de tramo -->
+              <Border Background="{DynamicResource Brush.PrimarioSutil}" CornerRadius="10"
+                      Padding="12" Margin="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="AGREGAR TRAMO" Style="{DynamicResource Texto.MicroLabel}" />
+                  <!-- Para qué sirve, que no era obvio (pedido 2026-08-14):
+                       los días de arriba son los FIJOS; esto es para el caso
+                       suelto —el sábado puntual que sí viene— y para partir un
+                       día en mañana y tarde. -->
+                  <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"
+                             Style="{DynamicResource Texto.Caption}"
+                             Foreground="{DynamicResource Brush.TextoSecundario}"
+                             Text="Un tramo es un pedazo del día en que el médico atiende. Sirve para dos cosas: partir un día en mañana y tarde (dos tramos dejan libre la hora del almuerzo), y agregar un día suelto que no es de los fijos." />
+                  <ComboBox Margin="0,10,0,0" Height="34"
+                            ItemsSource="{Binding DiasSemana}"
+                            SelectedItem="{Binding DiaSeleccionado}" />
+                  <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="6" />
+                      <ColumnDefinition Width="66" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                             ToolTip="Hora en que entra, por ejemplo 8:00"
+                             Text="{Binding HoraInicioTexto, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox Grid.Column="2" ItemsSource="{Binding Meridianos}"
+                              SelectedItem="{Binding HoraInicioMeridiano, Mode=TwoWay}" />
+                  </Grid>
+                  <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="6" />
+                      <ColumnDefinition Width="66" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                             ToolTip="Hora en que sale, por ejemplo 12:00"
+                             Text="{Binding HoraFinTexto, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox Grid.Column="2" ItemsSource="{Binding Meridianos}"
+                              SelectedItem="{Binding HoraFinMeridiano, Mode=TwoWay}" />
+                  </Grid>
+                  <TextBlock Text="{Binding MensajeHorario}" TextWrapping="Wrap" Margin="0,8,0,0"
+                             Foreground="{DynamicResource Brush.Destructivo}"
+                             Style="{DynamicResource Texto.Caption}" />
+                  <Button Content="Agregar" Margin="0,10,0,0"
+                          Style="{DynamicResource Boton.Primario}"
+                          Command="{Binding AgregarHorarioCommand}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

@@ -1,0 +1,92 @@
+<Window x:Class="MED100.Views.DocumentoAccionesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Documento del expediente"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Icon="pack://application:,,,/MED100.Views;component/Assets/med100.ico"
+        Background="{DynamicResource Brush.FondoApp}">
+
+  <Border Margin="24" Style="{DynamicResource Card}" Padding="24">
+    <StackPanel>
+      <!-- Ficha del archivo -->
+      <StackPanel Orientation="Horizontal">
+        <Border Width="56" Height="56" CornerRadius="12"
+                Background="{DynamicResource Brush.PrimarioSutil}">
+          <TextBlock x:Name="IconoArchivo" FontFamily="Segoe MDL2 Assets" FontSize="26"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Brush.Primario}" />
+        </Border>
+        <StackPanel Margin="14,0,0,0" VerticalAlignment="Center" MaxWidth="340">
+          <TextBlock x:Name="TextoNombre" Style="{DynamicResource Texto.CuerpoEnfatizado}"
+                     TextWrapping="Wrap" />
+          <TextBlock x:Name="TextoDetalle" Style="{DynamicResource Texto.Caption}"
+                     TextWrapping="Wrap" Margin="0,2,0,0" />
+        </StackPanel>
+      </StackPanel>
+
+      <Border Height="1" Background="{DynamicResource Brush.BordeSutil}" Margin="0,18,0,14" />
+
+      <TextBlock Text="¿Qué querés hacer con este documento?"
+                 Style="{DynamicResource Texto.Caption}" Margin="0,0,0,10" />
+
+      <!-- Abrir y guardar: para cualquiera que tenga la pantalla.
+           Abrir queda registrado en auditoría — son datos de salud. -->
+      <Button Content="Abrir con la aplicación de Windows"
+              Style="{DynamicResource Boton.Primario}" Click="Abrir_Click" />
+      <Button Content="Guardar una copia…" Style="{DynamicResource Boton.Secundario}"
+              Margin="0,8,0,0" Click="Guardar_Click" />
+
+      <!-- Reclasificar: no rompe nada, así que no es exclusivo del Admin -->
+      <TextBlock Text="Para qué es este papel" Style="{DynamicResource Input.Label}"
+                 Margin="0,16,0,6" />
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="8" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ComboBox x:Name="ComboTipos" Grid.Column="0" Height="38" FontSize="12">
+          <ComboBox.ItemTemplate>
+            <DataTemplate><TextBlock Text="{Binding Etiqueta}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="2" Content="Cambiar" Style="{DynamicResource Boton.Secundario}"
+                Click="CambiarTipo_Click" />
+      </Grid>
+
+      <!-- Re-ubicar y eliminar: EXCLUSIVOS del Admin. La regla real vive en
+           ExpedienteService; acá se ocultan para no ofrecer lo que va a ser
+           rechazado. -->
+      <StackPanel x:Name="PanelAdmin">
+        <Border Height="1" Background="{DynamicResource Brush.BordeSutil}" Margin="0,18,0,12" />
+        <TextBlock Text="Solo administradores" Style="{DynamicResource Texto.MicroLabel}" />
+
+        <TextBlock Text="Re-ubicar en otro paciente" Style="{DynamicResource Input.Label}"
+                   Margin="0,10,0,6" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="8" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ComboBox x:Name="ComboDestinos" Grid.Column="0" Height="38" FontSize="12"
+                    IsEditable="True" IsTextSearchEnabled="True">
+            <ComboBox.ItemTemplate>
+              <DataTemplate><TextBlock Text="{Binding Texto}" /></DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="2" Content="Mover" Style="{DynamicResource Boton.Secundario}"
+                  Click="Reubicar_Click" />
+        </Grid>
+
+        <Button Content="Eliminar del expediente" Style="{DynamicResource Boton.Destructivo}"
+                Margin="0,12,0,0" Click="Eliminar_Click" />
+      </StackPanel>
+
+      <Button Content="Cerrar" Style="{DynamicResource Boton.Terciario}" Margin="0,18,0,0"
+              HorizontalAlignment="Right" IsCancel="True" Click="Cerrar_Click" />
+    </StackPanel>
+  </Border>
+</Window>

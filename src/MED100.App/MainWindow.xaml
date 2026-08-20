@@ -1,0 +1,260 @@
+<Window x:Class="MED100.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MED100.ViewModels;assembly=MED100.ViewModels"
+        Title="MED-100"
+        Width="1280" Height="760"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/MED100.Views;component/Assets/med100.ico"
+        Background="{DynamicResource Brush.FondoApp}">
+
+  <!-- Raiz: recibe el LayoutTransform del tamaño de texto (Configuración) -->
+  <Grid x:Name="Raiz">
+    <Grid.ColumnDefinitions>
+      <!-- Sidebar fijo de 240px — DESIGN.md §9 -->
+      <ColumnDefinition Width="240" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ============ SIDEBAR ============ -->
+    <Border Grid.Column="0" Background="{DynamicResource Brush.FondoCard}"
+            BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0,0.5,0">
+      <DockPanel>
+
+        <!-- Logo -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,20,20,24">
+          <StackPanel Orientation="Horizontal">
+          <!-- Cruz médica dibujada, no una fuente: el "5" de acá era herencia
+               del POS-500 y en una clínica no dice nada. Path en vez de glifo
+               para no depender de qué fuente tenga instalada la PC. -->
+          <Border Width="28" Height="28" CornerRadius="8"
+                  Background="{DynamicResource Brush.Primario}">
+            <Path Fill="White" Stretch="Uniform" Width="14" Height="14"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                  Data="M 6,0 H 10 V 6 H 16 V 10 H 10 V 16 H 6 V 10 H 0 V 6 H 6 Z" />
+          </Border>
+          <TextBlock Text="MED-100" Style="{DynamicResource Texto.Titulo3}"
+                     VerticalAlignment="Center" Margin="10,0,0,0" />
+          </StackPanel>
+
+          <!-- Pastilla del demo. Debajo del nombre y no al lado: en Grande el
+               texto ya llena los 240px del sidebar. Se ve siempre porque es lo
+               que le recuerda al cliente que hay que comprar, y desaparece
+               sola al activar. -->
+          <Border Style="{DynamicResource Pill}" Margin="0,10,0,0"
+                  Background="{DynamicResource Brush.PorVencer.Fondo}"
+                  ToolTip="Versión de prueba. Se activa en Configuración → Licencia."
+                  Visibility="{Binding EnDemo, Converter={StaticResource BoolAVisibilidad}}">
+            <TextBlock Text="{Binding EtiquetaLicencia}" Style="{DynamicResource Pill.Texto}"
+                       Foreground="{DynamicResource Brush.PorVencer.Texto}" />
+          </Border>
+        </StackPanel>
+
+        <!-- Usuario + rol + salir (pie del sidebar) -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Brush.BordeSutil}"
+                BorderThickness="0,0.5,0,0" Padding="20,14">
+          <DockPanel>
+            <!-- Botones circulares del pie: salir y cambio rápido de usuario -->
+            <DockPanel.Resources>
+              <ControlTemplate x:Key="BotonCircular" TargetType="Button">
+                <Border x:Name="Fondo" CornerRadius="14" Background="Transparent">
+                  <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Fondo" Property="Background"
+                            Value="{DynamicResource Brush.PrimarioSutil}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Primario}" />
+                  </Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </DockPanel.Resources>
+
+            <Button DockPanel.Dock="Right" Content="⏻" FontSize="14" Width="28" Height="28"
+                    Cursor="Hand" Foreground="{DynamicResource Brush.TextoTerciario}"
+                    Template="{StaticResource BotonCircular}"
+                    ToolTip="Cerrar sesión y salir" Click="BotonSalir_Click" />
+
+            <!-- Cambio rápido de usuario: pide credenciales sin cerrar la app
+                 (pedido de Yuber 2026-07-12, para el relevo de turno) -->
+            <Button DockPanel.Dock="Right" Content="&#xE748;" FontFamily="Segoe MDL2 Assets"
+                    FontSize="13" Width="28" Height="28" Margin="0,0,4,0"
+                    Cursor="Hand" Foreground="{DynamicResource Brush.TextoTerciario}"
+                    Template="{StaticResource BotonCircular}"
+                    ToolTip="Cambiar de usuario" Click="BotonCambiarUsuario_Click" />
+            <Border Width="32" Height="32" CornerRadius="16"
+                    Background="{DynamicResource Brush.PrimarioSutil}">
+              <TextBlock Text="{Binding Iniciales}" FontSize="11" FontWeight="SemiBold"
+                         Foreground="{DynamicResource Brush.Primario}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+              <TextBlock Text="{Binding NombreUsuario}" Style="{DynamicResource Texto.CuerpoEnfatizado}" />
+              <!-- Multiusuario: se muestra el ROL del empleado activo -->
+              <TextBlock Text="{Binding RolUsuario}" Style="{DynamicResource Texto.Caption}" />
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
+        <!-- Navegación: cada ítem SOLO es visible con su permiso (spec §6).
+             IsChecked refleja PaginaActual (patrón OneWay + Igualdad de PrestControl).
+             ScrollViewer: con el texto en Mediano/Grande el menú no cabe en pantallas
+             normales y quedaban inalcanzables Usuarios y Configuración
+             (reportado por Yuber 2026-07-12). -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <TextBlock Text="MENÚ PRINCIPAL" Style="{DynamicResource Texto.MicroLabel}"
+                     Margin="24,0,0,8" />
+          <RadioButton Content="Panel" Tag="&#xE80F;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Resumen del día: cuánto se cobró hoy y en el mes, insumos por vencer y los que se están acabando. Es la pantalla para mirar de reojo al abrir."
+                       Visibility="{Binding PuedeVerPanel, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Panel}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Panel}" />
+          <RadioButton Content="Vender" Tag="&#xE7BF;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Cobrar. Se arma la factura con procedimientos e insumos, se elige el médico y el seguro, y sale el recibo."
+                       Visibility="{Binding PuedeVerVender, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Vender}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Vender}" />
+          <!-- La página se llama Pagina.Clientes y la tabla es `cliente`: en una
+               clínica el cliente ES el paciente, y el dueño lo llama así. -->
+          <RadioButton Content="Pacientes" Tag="&#xE716;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Registro de pacientes: datos, quién lo refirió y su historial de citas, turnos y facturas. Acá NO van diagnósticos ni tratamientos."
+                       Visibility="{Binding PuedeVerClientes, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Clientes}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Clientes}" />
+          <RadioButton Content="Médicos" Tag="&#xE77B;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Los médicos de la clínica: su especialidad, su exequátur, el porcentaje de honorario y los días y horas en que atienden."
+                       Visibility="{Binding PuedeVerMedicos, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Medicos}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Medicos}" />
+          <RadioButton Content="Procedimientos" Tag="&#xE95E;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="El tarifario: qué se hace en la clínica, cuánto cuesta y cuánto ocupa en la agenda."
+                       Visibility="{Binding PuedeVerProcedimientos, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Procedimientos}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Procedimientos}" />
+          <RadioButton Content="Citas" Tag="&#xE787;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="La agenda. Se saca cita con un médico en un horario libre y sale el recordatorio por correo."
+                       Visibility="{Binding PuedeVerCitas, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Citas}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Citas}" />
+          <RadioButton Content="Sala de espera" Tag="&#xE77B;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Los turnos de hoy: dar el número al que entra, llamar al siguiente y ver cuánto lleva esperando cada quien."
+                       Visibility="{Binding PuedeVerTurnos, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Turnos}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Turnos}" />
+          <!-- Almacén de expedientes: los papeles del paciente. Va pegado a
+               Sala de espera porque las dos son del mostrador. -->
+          <RadioButton Content="Expedientes" Tag="&#xE8A5;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Los papeles de cada paciente: cédula, carné de la ARS, consentimientos, referimientos y estudios que trajo. Se guardan para tenerlos a mano la próxima vez que venga."
+                       Visibility="{Binding PuedeVerExpedientes, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Expedientes}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Expedientes}" />
+          <RadioButton Content="Productos" Tag="&#xE7B8;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Los insumos: precio, existencia y fecha de vencimiento."
+                       Visibility="{Binding PuedeVerProductos, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Productos}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Productos}" />
+          <RadioButton Content="Almacén" Tag="&#xE8F1;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Cuánto insumo hay y cuánto vale lo que está guardado."
+                       Visibility="{Binding PuedeVerAlmacen, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Almacen}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Almacen}" />
+          <RadioButton Content="Caducidad" Tag="&#xE787;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Semáforo de vencimientos: qué insumo se vence pronto y cuál ya se venció. Un insumo vencido no se usa con un paciente."
+                       Visibility="{Binding PuedeVerCaducidad, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Caducidad}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Caducidad}" />
+          <RadioButton Content="Comprobantes" Tag="&#xE8A5;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Buscar una factura ya emitida para verla, reimprimirla o anularla."
+                       Visibility="{Binding PuedeVerComprobantes, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Comprobantes}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Comprobantes}" />
+          <RadioButton Content="Cuadre de caja" Tag="&#xE8C7;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="El cierre del día: cuánto entró por efectivo, tarjeta y transferencia, y cuánto cubrieron los seguros."
+                       Visibility="{Binding PuedeVerCuadre, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Cuadre}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Cuadre}" />
+          <RadioButton Content="Reportes" Tag="&#xE9D2;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Lo cobrado en un rango de fechas, con el desglose por médico, por procedimiento y por método de pago."
+                       Visibility="{Binding PuedeVerReportes, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Reportes}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Reportes}" />
+          <RadioButton Content="Usuarios" Tag="&#xE77B;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Las cuentas del personal: crear, cambiar el rol y dar o quitar permisos sueltos."
+                       Visibility="{Binding PuedeVerUsuarios, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Usuarios}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Usuarios}" />
+          <RadioButton Content="Configuración" Tag="&#xE713;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Datos de la clínica, impuestos, impresión, seguros, respaldo de la base de datos y exportación a Excel."
+                       Visibility="{Binding PuedeVerConfiguracion, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Configuracion}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Configuracion}" />
+        </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <!-- ============ ÁREA PRINCIPAL ============ -->
+    <Grid Grid.Column="1" Margin="32">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <TextBlock Grid.Row="0" Text="{Binding TituloPagina}"
+                 Style="{DynamicResource Texto.Titulo1}" Margin="0,0,0,20" />
+
+      <!-- Página activa: el DataTemplate global (App.xaml) resuelve la View -->
+      <ContentControl Grid.Row="1" Content="{Binding PaginaActualVm}" Focusable="False" />
+    </Grid>
+  </Grid>
+</Window>

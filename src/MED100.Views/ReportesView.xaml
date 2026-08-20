@@ -1,0 +1,182 @@
+<UserControl x:Class="MED100.Views.ReportesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+    <StackPanel>
+
+      <!-- Rango -->
+      <Border Style="{DynamicResource Card}" Padding="16" Margin="0,0,0,16">
+        <WrapPanel Orientation="Horizontal">
+          <StackPanel Width="180" Margin="0,0,0,4">
+            <TextBlock Text="Período" Style="{DynamicResource Input.Label}" />
+            <ComboBox Height="40" FontSize="13"
+                      ItemsSource="{Binding Atajos}"
+                      SelectedItem="{Binding AtajoSeleccionado}" />
+          </StackPanel>
+          <StackPanel Margin="12,0,0,0">
+            <TextBlock Text="Desde" Style="{DynamicResource Input.Label}" />
+            <DatePicker Width="150" Height="40" FontSize="13" SelectedDate="{Binding Desde}" />
+          </StackPanel>
+          <StackPanel Margin="12,0,0,0">
+            <TextBlock Text="Hasta" Style="{DynamicResource Input.Label}" />
+            <DatePicker Width="150" Height="40" FontSize="13" SelectedDate="{Binding Hasta}" />
+          </StackPanel>
+          <Button Content="Generar" Style="{DynamicResource Boton.Primario}"
+                  VerticalAlignment="Bottom" Margin="12,0,0,0"
+                  Command="{Binding GenerarCommand}"
+                  IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+        </WrapPanel>
+      </Border>
+
+      <TextBlock Text="{Binding PeriodoTexto}" Style="{DynamicResource Texto.Titulo2}"
+                 Margin="4,0,0,14" />
+
+      <!-- KPIs del período -->
+      <UniformGrid Columns="4" Margin="0,0,0,16">
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="TOTAL VENDIDO" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalVendido, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="FACTURAS" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalFacturas}" Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="TICKET PROMEDIO" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TicketPromedio, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}">
+          <StackPanel>
+            <TextBlock Text="ITBIS COBRADO" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalItbis, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- Tendencia -->
+      <Border Style="{DynamicResource Card}" Padding="20,16" Height="280" Margin="0,0,0,16">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="0" Text="Ventas por día" Style="{DynamicResource Texto.Titulo3}"
+                     Margin="0,0,0,12" />
+          <lvc:CartesianChart Grid.Row="1"
+                              Series="{Binding Series}"
+                              XAxes="{Binding XAxes}"
+                              YAxes="{Binding YAxes}" />
+        </Grid>
+      </Border>
+
+      <Grid Margin="0,0,0,16">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Métodos de pago -->
+        <Border Grid.Column="0" Style="{DynamicResource Card}" Padding="24">
+          <StackPanel>
+            <TextBlock Text="Cobrado por método de pago" Style="{DynamicResource Texto.Titulo3}"
+                       Margin="0,0,0,14" />
+            <DockPanel Margin="0,0,0,8">
+              <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                         Text="{Binding Efectivo, Converter={StaticResource Money}}" />
+              <TextBlock Text="Efectivo" Style="{DynamicResource Texto.Cuerpo}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,8">
+              <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                         Text="{Binding Tarjeta, Converter={StaticResource Money}}" />
+              <TextBlock Text="Tarjeta" Style="{DynamicResource Texto.Cuerpo}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,8">
+              <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                         Text="{Binding Transferencia, Converter={StaticResource Money}}" />
+              <TextBlock Text="Transferencia" Style="{DynamicResource Texto.Cuerpo}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,12">
+              <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                         Text="{Binding Mixto, Converter={StaticResource Money}}" />
+              <TextBlock Text="Mixto" Style="{DynamicResource Texto.Cuerpo}" />
+            </DockPanel>
+
+            <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                    Margin="0,0,0,12" />
+
+            <!-- Anuladas: informadas, nunca sumadas -->
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                         Foreground="{DynamicResource Brush.Destructivo}"
+                         Text="{Binding MontoAnulado, Converter={StaticResource Money}}" />
+              <TextBlock Style="{DynamicResource Texto.Caption}"
+                         Text="{Binding FacturasAnuladas, StringFormat='Anuladas del período ({0}) — no suman al total'}" />
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Por cajero -->
+        <Border Grid.Column="2" Style="{DynamicResource Card}" Padding="24">
+          <StackPanel>
+            <TextBlock Text="Ventas por cajero" Style="{DynamicResource Texto.Titulo3}"
+                       Margin="0,0,0,14" />
+            <ItemsControl ItemsSource="{Binding PorCajero}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <DockPanel Margin="0,0,0,10">
+                    <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center"
+                               Style="{DynamicResource Texto.Monto}"
+                               Text="{Binding Total, Converter={StaticResource Money}}" />
+                    <StackPanel>
+                      <TextBlock Text="{Binding Nombre}" Style="{DynamicResource Texto.CuerpoEnfatizado}" />
+                      <TextBlock Text="{Binding FacturasTexto}" Style="{DynamicResource Texto.Caption}" />
+                    </StackPanel>
+                  </DockPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <!-- Top productos -->
+      <Border Style="{DynamicResource Card}" Padding="0" Margin="0,0,0,24">
+        <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding TopProductos}"
+                  MaxHeight="320">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="#" Binding="{Binding Puesto}" Width="Auto" MinWidth="50" />
+            <DataGridTextColumn Header="Producto más vendido" Binding="{Binding Nombre}" Width="*" MinWidth="150"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <DataGridTextColumn Header="Unidades" Binding="{Binding UnidadesTexto}" Width="Auto" MinWidth="140" />
+            <DataGridTextColumn Header="Total"
+                                Binding="{Binding Total, Converter={StaticResource Money}}" Width="Auto" MinWidth="150">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

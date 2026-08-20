@@ -1,0 +1,62 @@
+PREREQUISITOS DEL INSTALADOR DE FACONTROL
+=========================================
+
+Pedido del cliente (2026-07-29): que el instalador ofrezca instalar AnyDesk,
+MySQL y Google Drive antes de MED-100.
+
+QUÉ HAY QUE DEJAR EN ESTA CARPETA
+---------------------------------
+
+Los archivos tienen que llamarse EXACTAMENTE así (el .iss los busca por nombre):
+
+  mysql-installer-web-community-8.0.46.0.msi   MySQL Server 8.0 (instalador WEB)
+  AnyDesk.exe                     AnyDesk para Windows
+  GoogleDriveSetup.exe            Google Drive para escritorio
+
+De dónde bajarlos:
+
+  MySQL   https://dev.mysql.com/downloads/installer/
+  AnyDesk https://anydesk.com/es/downloads/windows
+  Drive   https://www.google.com/intl/es/drive/download/
+
+
+CÓMO SE COMPORTA EL INSTALADOR
+------------------------------
+
+* El .iss revisa AL COMPILAR si cada archivo está. El que no esté, simplemente no
+  aparece: el instalador compila igual, sin errores.
+* Los que estén salen como casillas marcables en la página "Programas necesarios",
+  y el usuario puede desmarcar lo que ya tenga instalado.
+* Se ejecutan DESPUÉS de copiar MED-100 y ANTES de abrirlo.
+* Van con su ventana visible a propósito: el instalador de MySQL pide la
+  contraseña de root, y esa hay que elegirla con el cliente delante — no puede
+  quedar al azar en una instalación silenciosa.
+* Los instaladores se copian a la carpeta temporal y se borran al terminar: no
+  quedan ocupando espacio en la PC del cliente.
+
+
+NOTA SOBRE 32 vs 64 BITS
+------------------------
+
+MED-100 es de 64 bits (el instalador no corre en Windows de 32 bits), así que
+alcanza con el MySQL de 64 bits. Si alguna vez hace falta una PC de 32 bits, hay
+que compilar también la app para x86 — no es solo cambiar el MySQL.
+
+
+PESO DEL INSTALADOR
+-------------------
+
+MED-100 solo pesa ~60 MB. Con MySQL adentro pasa de 500 MB. Si eso complica
+pasarlo por WhatsApp o por USB, la alternativa es dejar esta carpeta vacía y
+llevar los tres instaladores aparte, en la misma memoria.
+
+Esta carpeta está en .gitignore: los instaladores de terceros NO van al repositorio.
+
+OJO CON EL INSTALADOR **WEB** DE MYSQL
+--------------------------------------
+
+El que esta puesto (mysql-installer-web-community) pesa 2 MB porque descarga
+los componentes al ejecutarse: la PC del cliente necesita **internet durante la
+instalacion**. Si vas a instalar en un local sin conexion confiable, baja el
+instalador COMPLETO (el de ~450 MB, "mysql-installer-community-8.0.xx.msi"),
+dejalo en esta carpeta y cambiale el nombre en MED-100.iss (#define ExeMySql).

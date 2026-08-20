@@ -1,0 +1,38 @@
+﻿bin/
+obj/
+*.user
+.vs/
+logs/
+publish/
+installer/Output/
+
+# Publicación e instalador (artefactos binarios)
+publish/
+installer/Output/
+
+# Prerequisitos del instalador: los .exe/.msi de MySQL, AnyDesk y Google Drive
+# pesan ~270 MB juntos y son binarios de terceros — no van al repositorio.
+# El LEEME explica de donde bajarlos y con que nombre exacto guardarlos.
+installer/prerequisitos/*
+!installer/prerequisitos/LEEME.txt
+
+# Secretos y config local (NUNCA subir) — el App Password del correo y la
+# cadena de conexión del cliente viven en estos archivos.
+ajustes.json
+*.dll.config
+secrets.json
+appsettings.Production.json
+appsettings.*.Production.json
+*.pfx
+*.snk
+.env
+
+# Licencia de la instalación: es del equipo del cliente, no del repositorio.
+licencia.json
+
+# Herramientas / resultados de test
+.idea/
+*.suo
+TestResults/
+__pycache__/
+*.pyc

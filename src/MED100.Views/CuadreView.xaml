@@ -1,0 +1,162 @@
+<UserControl x:Class="MED100.Views.CuadreView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+    <StackPanel MaxWidth="1000" HorizontalAlignment="Left">
+
+      <!-- Selector: cajero (o General) + día + tamaño de impresión -->
+      <Border Style="{DynamicResource Card}" Padding="16" Margin="0,0,0,16">
+        <WrapPanel Orientation="Horizontal">
+          <StackPanel Width="250" Margin="0,0,0,4"
+                      Visibility="{Binding PuedeElegirCajero, Converter={StaticResource BoolAVisibilidad}}">
+            <TextBlock Text="Cuadre" Style="{DynamicResource Input.Label}" />
+            <ComboBox ItemsSource="{Binding Cajeros}"
+                      SelectedItem="{Binding CajeroSeleccionado}" />
+          </StackPanel>
+          <StackPanel Margin="12,0,0,0">
+            <TextBlock Text="Día" Style="{DynamicResource Input.Label}" />
+            <DatePicker Width="170" SelectedDate="{Binding Fecha}" />
+          </StackPanel>
+          <StackPanel Margin="12,0,0,0" Width="160">
+            <TextBlock Text="Imprimir en" Style="{DynamicResource Input.Label}" />
+            <ComboBox ItemsSource="{Binding Tamanos}"
+                      SelectedItem="{Binding TamanoSeleccionado}" />
+          </StackPanel>
+          <Button Content="Ver e imprimir" Style="{DynamicResource Boton.Secundario}"
+                  VerticalAlignment="Bottom" Margin="12,0,0,0"
+                  Command="{Binding ImprimirCommand}"
+                  IsEnabled="{Binding PuedeImprimir}" />
+        </WrapPanel>
+      </Border>
+
+      <TextBlock Text="{Binding TituloCuadre}" Style="{DynamicResource Texto.Titulo2}"
+                 Margin="4,0,0,14" />
+
+      <!-- Totales -->
+      <UniformGrid Columns="4" Margin="0,0,0,16">
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="FACTURAS" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalFacturas}" Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="TOTAL VENDIDO" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalVendido, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+          <StackPanel>
+            <TextBlock Text="EFECTIVO EN CAJA" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TotalEfectivo, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+        <Border Style="{DynamicResource Card.Metrica}">
+          <StackPanel>
+            <TextBlock Text="TIEMPO ACTIVO" Style="{DynamicResource Texto.MicroLabel}" />
+            <Viewbox Style="{DynamicResource Metrica.Valor}">
+              <TextBlock Text="{Binding TiempoActivoTexto}" Style="{DynamicResource Texto.Display}"
+  TextWrapping="Wrap" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- Desglose por cajero (solo en modo general) -->
+      <Border Style="{DynamicResource Card}" Padding="0" Margin="0,0,0,16"
+              Visibility="{Binding EsGeneral, Converter={StaticResource BoolAVisibilidad}}">
+        <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Desglose}" MaxHeight="280">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Cajero" Binding="{Binding Nombre}" Width="*" MinWidth="150"
+                                HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+            <DataGridTextColumn Header="Facturas" Binding="{Binding Facturas}" Width="Auto" MinWidth="100" />
+            <DataGridTextColumn Header="Efectivo"
+                                Binding="{Binding Efectivo, Converter={StaticResource Money}}" Width="Auto" MinWidth="130">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTextColumn Header="Tarjeta"
+                                Binding="{Binding Tarjeta, Converter={StaticResource Money}}" Width="Auto" MinWidth="130">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTextColumn Header="Total"
+                                Binding="{Binding Total, Converter={StaticResource Money}}" Width="Auto" MinWidth="140">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTextColumn Header="Tiempo" Binding="{Binding TiempoActivo}" Width="Auto" MinWidth="110" />
+            <DataGridTextColumn Header="Estado" Binding="{Binding EstadoTexto}" Width="Auto" MinWidth="100" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </Border>
+
+      <!-- Desglose por método de pago -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Desglose por método de pago" Style="{DynamicResource Texto.Titulo3}"
+                     Margin="0,0,0,14" />
+
+          <DockPanel Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                       Text="{Binding TotalEfectivo, Converter={StaticResource Money}}" />
+            <TextBlock Text="Efectivo" Style="{DynamicResource Texto.Cuerpo}" />
+          </DockPanel>
+          <DockPanel Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                       Text="{Binding TotalTarjeta, Converter={StaticResource Money}}" />
+            <TextBlock Text="Tarjeta" Style="{DynamicResource Texto.Cuerpo}" />
+          </DockPanel>
+          <DockPanel Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                       Text="{Binding TotalTransferencia, Converter={StaticResource Money}}" />
+            <TextBlock Text="Transferencia" Style="{DynamicResource Texto.Cuerpo}" />
+          </DockPanel>
+          <DockPanel Margin="0,0,0,12">
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                       Text="{Binding TotalMixto, Converter={StaticResource Money}}" />
+            <TextBlock Text="Mixto" Style="{DynamicResource Texto.Cuerpo}" />
+          </DockPanel>
+
+          <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                  Margin="0,0,0,12" />
+
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.MontoTotal}"
+                       Text="{Binding TotalVendido, Converter={StaticResource Money}}" />
+            <TextBlock Text="TOTAL" Style="{DynamicResource Texto.Titulo3}" />
+          </DockPanel>
+
+          <DockPanel Margin="0,14,0,0">
+            <TextBlock DockPanel.Dock="Right" Style="{DynamicResource Texto.Monto}"
+                       Foreground="{DynamicResource Brush.Destructivo}"
+                       Text="{Binding MontoAnulado, Converter={StaticResource Money}}" />
+            <TextBlock Style="{DynamicResource Texto.Caption}"
+                       Text="{Binding FacturasAnuladas, StringFormat='Anuladas del día ({0}) — no incluidas en el total'}" />
+          </DockPanel>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding MensajeEstado}" Style="{DynamicResource Texto.Caption}"
+                 TextWrapping="Wrap" Margin="4,0,0,0" />
+
+      <Button Content="Cerrar cuadre del día" Style="{DynamicResource Boton.Primario}"
+              HorizontalAlignment="Left" Margin="0,16,0,24"
+              Command="{Binding CerrarCommand}"
+              IsEnabled="{Binding PuedeCerrar}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

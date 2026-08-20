@@ -1,0 +1,98 @@
+<Application x:Class="MED100.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:MED100.Common.Converters;assembly=MED100.Common"
+             xmlns:vm="clr-namespace:MED100.ViewModels;assembly=MED100.ViewModels"
+             xmlns:views="clr-namespace:MED100.Views;assembly=MED100.Views"
+             ShutdownMode="OnExplicitShutdown">
+  <!-- Sin StartupUri: el arranque lo controla App.xaml.cs (login → shell) -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/MED100.Views;component/Themes/Colores.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/MED100.Views;component/Themes/Tipografia.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/MED100.Views;component/Themes/Controles.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <!-- Converters globales (regla del proyecto: formateo unificado) -->
+      <conv:MoneyConverter x:Key="Money" />
+      <conv:DateConverter x:Key="Fecha" />
+      <conv:InverseBooleanConverter x:Key="InversorBool" />
+      <conv:BooleanToVisibilityInversoConverter x:Key="InversorBoolVisibilidad" />
+      <conv:IgualdadConverter x:Key="Igualdad" />
+      <BooleanToVisibilityConverter x:Key="BoolAVisibilidad" />
+
+      <!-- Mapeo ViewModel → View del área principal del shell -->
+      <DataTemplate DataType="{x:Type vm:VenderViewModel}">
+        <views:VenderView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ClientesViewModel}">
+        <views:ClientesListView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ClienteFormViewModel}">
+        <views:ClienteFormView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:PacienteFichaViewModel}">
+        <views:PacienteFichaView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:MedicosViewModel}">
+        <views:MedicosView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ProcedimientosViewModel}">
+        <views:ProcedimientosView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:CitasViewModel}">
+        <views:CitasView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:TurnosViewModel}">
+        <views:TurnosView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ExpedientesViewModel}">
+        <views:ExpedientesView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ExpedientePacienteViewModel}">
+        <views:ExpedientePacienteView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ProductosViewModel}">
+        <views:ProductosListView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ProductoFormViewModel}">
+        <views:ProductoFormView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:AlmacenViewModel}">
+        <views:AlmacenView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:CaducidadViewModel}">
+        <views:CaducidadView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:PanelViewModel}">
+        <views:PanelView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ReportesViewModel}">
+        <views:ReportesView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ComprobantesViewModel}">
+        <views:ComprobantesView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:CuadreViewModel}">
+        <views:CuadreView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:UsuariosViewModel}">
+        <views:UsuariosView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:ConfiguracionViewModel}">
+        <views:ConfiguracionView />
+      </DataTemplate>
+      <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}">
+        <Border Style="{DynamicResource Card}">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="Módulo en construcción" Style="{DynamicResource Texto.Titulo2}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding Descripcion}" Style="{DynamicResource Texto.Caption}"
+                       HorizontalAlignment="Center" Margin="0,6,0,0" />
+          </StackPanel>
+        </Border>
+      </DataTemplate>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

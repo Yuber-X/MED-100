@@ -1,0 +1,107 @@
+<UserControl x:Class="MED100.Views.ClientesListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Toolbar -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,16">
+      <Button DockPanel.Dock="Right" Content="+ Nuevo paciente"
+              Style="{DynamicResource Boton.Primario}"
+              Visibility="{Binding PuedeEditar, Converter={StaticResource BoolAVisibilidad}}"
+              Command="{Binding NuevoCommand}" />
+      <TextBox Width="320" HorizontalAlignment="Left"
+               Style="{DynamicResource Input.Texto}"
+               Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+               ToolTip="Buscar por nombre, cédula, teléfono, correo o quién lo refirió" />
+    </DockPanel>
+
+    <!-- Tabla.
+         Todas las columnas llevan MinWidth y las de texto largo van con
+         Width fijo: sin eso el DataGrid comprime las columnas para que
+         entren todas y los datos salen cortados (reportado 2026-08-14).
+         Con los mínimos puestos aparece el scroll horizontal del estilo
+         Tabla, que es lo que corresponde cuando no caben. -->
+    <Border Grid.Row="1" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Filas}"
+                SelectedItem="{Binding FilaSeleccionada}">
+        <!-- Doble clic en la fila = ver detalles. Es lo que la gente
+             intenta antes de buscar el botón. -->
+        <DataGrid.InputBindings>
+          <MouseBinding MouseAction="LeftDoubleClick"
+                        Command="{Binding VerDetallesCommand}"
+                        CommandParameter="{Binding FilaSeleccionada}" />
+        </DataGrid.InputBindings>
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Cédula" Binding="{Binding CedulaTexto}" Width="Auto" MinWidth="150">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource Fuente.Mono}" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*" MinWidth="220"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <!-- Edad y sexo: es lo que la recepción confirma en voz alta para
+               asegurarse de que tiene al paciente correcto delante. -->
+          <DataGridTextColumn Header="Edad" Binding="{Binding EdadTexto}" Width="Auto" MinWidth="110" />
+          <DataGridTextColumn Header="Sexo" Binding="{Binding SexoTexto}" Width="Auto" MinWidth="80" />
+          <DataGridTextColumn Header="Teléfono" Binding="{Binding TelefonoTexto}" Width="Auto" MinWidth="150" />
+          <!-- Sin correo no hay recordatorio: se muestra apagado para que se note -->
+          <DataGridTextColumn Header="Correo" Binding="{Binding EmailTexto}" Width="Auto" MinWidth="240"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextoTerciario}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding TieneEmail}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextoPrincipal}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Referido por" Binding="{Binding ReferidorTexto}" Width="Auto" MinWidth="190"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <DataGridTemplateColumn Header="" Width="320">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <!-- Ver detalles NO pide clientes_editar: contestar "¿cuándo
+                       vino la última vez?" es consulta, y el cajero tiene que
+                       poder hacerlo. -->
+                  <Button Content="Ver detalles" Style="{DynamicResource Boton.Terciario}"
+                          Command="{Binding DataContext.VerDetallesCommand,
+                                    RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                          CommandParameter="{Binding}" />
+                  <StackPanel Orientation="Horizontal"
+                              Visibility="{Binding DataContext.PuedeEditar,
+                                          RelativeSource={RelativeSource AncestorType=DataGrid},
+                                          Converter={StaticResource BoolAVisibilidad}}">
+                    <Button Content="Editar" Style="{DynamicResource Boton.Terciario}" Margin="8,0,0,0"
+                            Command="{Binding DataContext.EditarCommand,
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}" />
+                    <Button Content="Eliminar" Style="{DynamicResource Boton.Terciario}"
+                            Foreground="{DynamicResource Brush.Destructivo}" Margin="8,0,0,0"
+                            Command="{Binding DataContext.EliminarCommand,
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <TextBlock Grid.Row="2" Text="{Binding ContadorTexto}"
+               Style="{DynamicResource Texto.Caption}" Margin="4,10,0,0" />
+  </Grid>
+</UserControl>

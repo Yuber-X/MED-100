@@ -1,0 +1,307 @@
+<UserControl x:Class="MED100.Views.TurnosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="16" />
+      <ColumnDefinition Width="360" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- ===== Cabecera: lo que está en la pantalla de la sala ===== -->
+    <Border Grid.Row="0" Grid.Column="0" Style="{DynamicResource Card}" Padding="20"
+            Margin="0,0,0,12">
+      <DockPanel>
+        <!-- Los dos botones apilados: "Dar turno" va DEBAJO de "Llamar al
+             siguiente" (pedido de Yuber 2026-08-14) y abre el panel de la
+             derecha, que el resto del tiempo muestra la ficha del médico. -->
+        <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+          <Button Content="Llamar al siguiente"
+                  Style="{DynamicResource Boton.Primario}" Padding="20,12"
+                  Command="{Binding LlamarSiguienteCommand}" />
+          <Button Content="Dar turno" Margin="0,8,0,0" Padding="20,10"
+                  Style="{DynamicResource Boton.Secundario}"
+                  Command="{Binding AbrirDarTurnoCommand}"
+                  ToolTip="Entrega el siguiente número a quien acaba de entrar" />
+        </StackPanel>
+        <StackPanel>
+          <TextBlock Text="LLAMANDO" Style="{DynamicResource Texto.MicroLabel}" />
+          <!-- Grande a propósito: es el número que se canta en voz alta -->
+          <TextBlock Text="{Binding EnPantalla}" FontSize="46" FontWeight="Bold"
+                     Foreground="{DynamicResource Brush.Primario}" Margin="0,2,0,0" />
+          <TextBlock Text="{Binding Resumen}" Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" Margin="2,6,0,0" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- ===== La sala ===== -->
+    <Border Grid.Row="1" Grid.Column="0" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid ItemsSource="{Binding Turnos}"
+                SelectedItem="{Binding Seleccionado}"
+                Style="{DynamicResource Tabla}">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Turno" Binding="{Binding Etiqueta}" Width="Auto" MinWidth="90">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="FontSize" Value="15" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <!-- "Sin registrar" en gris: el turno se da antes de saber quién es -->
+          <DataGridTextColumn Header="Paciente" Binding="{Binding PacienteTexto}" Width="*" MinWidth="150"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextoTerciario}" />
+                <Setter Property="FontStyle" Value="Italic" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding TienePaciente}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextoPrincipal}" />
+                    <Setter Property="FontStyle" Value="Normal" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Médico" Binding="{Binding MedicoTexto}" Width="Auto" MinWidth="170"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <DataGridTextColumn Header="Llegó" Binding="{Binding LlegadaTexto}" Width="Auto" MinWidth="90" />
+          <!-- La espera es lo que hace visible el problema antes de la queja -->
+          <DataGridTextColumn Header="Espera" Binding="{Binding EsperaTexto}" Width="Auto" MinWidth="100" />
+          <DataGridTemplateColumn Header="Estado" Width="110">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Border CornerRadius="6" Padding="8,3" HorizontalAlignment="Left">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Setter Property="Background" Value="{DynamicResource Brush.Cancelado.Fondo}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding EnEspera}" Value="True">
+                          <Setter Property="Background" Value="{DynamicResource Brush.AlDia.Fondo}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                  <TextBlock Text="{Binding EstadoTexto}" FontSize="12">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.Cancelado.Texto}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding EnEspera}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.AlDia.Texto}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </Border>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- ===== Panel derecho ===== -->
+    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+            Style="{DynamicResource Card}" Padding="20,20,8,20">
+      <Grid>
+
+        <!-- ================= Dar turno (oculto detrás del botón) ================= -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                      Visibility="{Binding DandoTurno, Converter={StaticResource BoolAVisibilidad}}">
+          <StackPanel>
+            <TextBlock Text="Dar turno" Style="{DynamicResource Texto.Titulo3}" />
+            <TextBlock TextWrapping="Wrap" Margin="0,4,0,14"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       Text="No hace falta llenar nada: el turno se puede dar en blanco y asignarle el paciente después." />
+
+            <TextBlock Text="Paciente (opcional)" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}"
+                     Text="{Binding BusquedaPaciente, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                     ToolTip="Escribí nombre, cédula o teléfono para acotar la lista de abajo" />
+            <ComboBox Margin="0,8,0,0"
+                      ItemsSource="{Binding PacientesSugeridos}"
+                      SelectedItem="{Binding PacienteSeleccionado, Mode=TwoWay}"
+                      ItemTemplate="{DynamicResource Combo.Nombre}" />
+            <TextBlock Text="{Binding MensajePacientes}" TextWrapping="Wrap"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}" Margin="2,4,0,0" />
+
+            <!-- El médico define el prefijo del número: con médico sale YO-7,
+                 sin médico el prefijo general del negocio. -->
+            <TextBlock Text="Médico (opcional)" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
+            <ComboBox ItemsSource="{Binding Medicos}"
+                      SelectedItem="{Binding MedicoSeleccionado, Mode=TwoWay}"
+                      ItemTemplate="{DynamicResource Combo.Nombre}" />
+            <TextBlock TextWrapping="Wrap" Margin="2,4,0,0"
+                       Style="{DynamicResource Texto.Caption}"
+                       Foreground="{DynamicResource Brush.TextoTerciario}"
+                       Text="Si elegís médico, el número sale con su código (YO-7) y el turno queda en su lista." />
+
+            <TextBlock Text="{Binding MensajeError}" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Foreground="{DynamicResource Brush.Destructivo}"
+                       Style="{DynamicResource Texto.Caption}" />
+
+            <Button Content="Dar turno e imprimir" Margin="0,18,0,0" Padding="16,12"
+                    Style="{DynamicResource Boton.Primario}"
+                    Command="{Binding DarTurnoCommand}"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+            <Button Content="Cancelar" Margin="0,8,0,0"
+                    Style="{DynamicResource Boton.Secundario}"
+                    Command="{Binding CerrarDarTurnoCommand}" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- ================= Turno elegido + su médico ================= -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,12,0"
+                      Visibility="{Binding DandoTurno, Converter={StaticResource InversorBoolVisibilidad}}">
+          <StackPanel>
+            <TextBlock Text="Elegí un turno de la lista para llamarlo, cerrarlo o ver los turnos de su médico."
+                       TextWrapping="Wrap" Style="{DynamicResource Texto.Cuerpo}"
+                       Foreground="{DynamicResource Brush.TextoSecundario}"
+                       Visibility="{Binding HaySeleccion,
+                                    Converter={StaticResource InversorBoolVisibilidad}}" />
+
+            <StackPanel Visibility="{Binding HaySeleccion, Converter={StaticResource BoolAVisibilidad}}">
+              <TextBlock Text="{Binding Seleccionado.Etiqueta}" FontSize="34" FontWeight="Bold"
+                         Foreground="{DynamicResource Brush.TextoPrincipal}" />
+              <TextBlock Text="{Binding Seleccionado.PacienteTexto}" TextWrapping="Wrap"
+                         Style="{DynamicResource Texto.Cuerpo}" Margin="0,4,0,0" />
+              <TextBlock Text="{Binding Seleccionado.EsperaTexto}"
+                         Style="{DynamicResource Texto.Caption}"
+                         Foreground="{DynamicResource Brush.TextoSecundario}" Margin="0,2,0,0" />
+
+              <!-- Solo aparece si el turno se dio sin paciente. El buscador va
+                   acá mismo y no en el panel de "Dar turno": obligar a abrir el
+                   otro panel, elegir y volver sería tres pasos para lo que es
+                   el caso NORMAL — el número se entrega en la puerta y el
+                   registro se hace después. Son los mismos campos, atados a las
+                   mismas propiedades. -->
+              <StackPanel Margin="0,14,0,0"
+                          Visibility="{Binding PuedeAsignarPaciente,
+                                       Converter={StaticResource BoolAVisibilidad}}">
+                <TextBlock Text="Asignarle el paciente" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}"
+                         Text="{Binding BusquedaPaciente, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                         ToolTip="Escribí nombre, cédula o teléfono para acotar la lista" />
+                <ComboBox Margin="0,8,0,0"
+                          ItemsSource="{Binding PacientesSugeridos}"
+                          SelectedItem="{Binding PacienteSeleccionado, Mode=TwoWay}"
+                          ItemTemplate="{DynamicResource Combo.Nombre}" />
+                <Button Content="Asignar al turno" Margin="0,8,0,0"
+                        Style="{DynamicResource Boton.Secundario}"
+                        Command="{Binding AsignarPacienteCommand}" />
+                <TextBlock Text="{Binding MensajeError}" TextWrapping="Wrap" Margin="2,8,0,0"
+                           Foreground="{DynamicResource Brush.Destructivo}"
+                           Style="{DynamicResource Texto.Caption}" />
+              </StackPanel>
+
+              <StackPanel Visibility="{Binding PuedeCerrarSeleccionado,
+                                       Converter={StaticResource BoolAVisibilidad}}">
+                <Button Content="Llamar este turno" Margin="0,10,0,0"
+                        Style="{DynamicResource Boton.Secundario}"
+                        Command="{Binding LlamarCommand}" />
+                <Grid Margin="0,10,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Button Grid.Column="0" Content="Atendido" Style="{DynamicResource Boton.Secundario}"
+                          Command="{Binding MarcarAtendidoCommand}" />
+                  <Button Grid.Column="2" Content="No contestó" Style="{DynamicResource Boton.Secundario}"
+                          Command="{Binding MarcarAusenteCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <Button Content="Reimprimir el papelito" Margin="0,10,0,0"
+                      Style="{DynamicResource Boton.Terciario}" HorizontalAlignment="Left"
+                      Command="{Binding ReimprimirCommand}" />
+
+              <!-- ===== El médico de este turno y TODOS sus turnos =====
+                   Sin mezclar con los de otros médicos: con dos o tres
+                   atendiendo a la vez, la lista general no contesta "¿a quién
+                   le toca ahora con la doctora?" (pedido 2026-08-14). -->
+              <StackPanel Visibility="{Binding HayMedicoEnElTurno,
+                                       Converter={StaticResource BoolAVisibilidad}}">
+                <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="0,0.5,0,0"
+                        Margin="0,20,0,16" />
+
+                <TextBlock Text="MÉDICO DE ESTE TURNO" Style="{DynamicResource Texto.MicroLabel}" />
+                <TextBlock Text="{Binding MedicoDelTurno}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Style="{DynamicResource Texto.Titulo3}" />
+                <TextBlock Text="{Binding EspecialidadDelTurno}"
+                           Style="{DynamicResource Texto.Caption}"
+                           Foreground="{DynamicResource Brush.TextoSecundario}" Margin="0,2,0,0" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                  <Border Background="{DynamicResource Brush.PrimarioSutil}" CornerRadius="6"
+                          Padding="9,4" Margin="0,0,8,0">
+                    <TextBlock Text="{Binding CodigoDelMedico}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Brush.Primario}" />
+                  </Border>
+                  <Border Background="{DynamicResource Brush.FondoEncabezadoTabla}" CornerRadius="6"
+                          Padding="9,4">
+                    <TextBlock Text="{Binding DiasDelMedico}" FontSize="12"
+                               Foreground="{DynamicResource Brush.TextoSecundario}" />
+                  </Border>
+                </StackPanel>
+
+                <TextBlock Text="{Binding EstadoDelMedico}" Margin="0,8,0,0"
+                           Style="{DynamicResource Texto.Caption}"
+                           Foreground="{DynamicResource Brush.TextoSecundario}" />
+                <TextBlock Text="{Binding ResumenDelMedico}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Style="{DynamicResource Texto.Caption}"
+                           Foreground="{DynamicResource Brush.TextoTerciario}" />
+
+                <TextBlock Text="SUS TURNOS DE HOY" Style="{DynamicResource Texto.MicroLabel}"
+                           Margin="0,16,0,8" />
+                <ItemsControl ItemsSource="{Binding TurnosDelMedico}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border CornerRadius="8" Padding="10,7" Margin="0,0,0,6"
+                              Background="{DynamicResource Brush.FondoEncabezadoTabla}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Etiqueta}"
+                                     FontWeight="Bold" Width="70"
+                                     Style="{DynamicResource Texto.Cuerpo}" />
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding EstadoTexto}"
+                                     FontSize="12" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.TextoTerciario}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding EnEspera}" Value="True">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource Brush.AlDia.Texto}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                          <TextBlock Text="{Binding PacienteTexto}" TextTrimming="CharacterEllipsis"
+                                     Margin="0,0,8,0" Style="{DynamicResource Texto.Cuerpo}" />
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

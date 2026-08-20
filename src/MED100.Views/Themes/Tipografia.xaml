@@ -1,0 +1,76 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Inter con fallback garantizado a Segoe UI — DESIGN.md §4 -->
+  <FontFamily x:Key="Fuente.Interfaz">Inter, Segoe UI</FontFamily>
+  <FontFamily x:Key="Fuente.Mono">JetBrains Mono, Consolas</FontFamily>
+
+  <!-- Escala tipográfica -->
+  <Style x:Key="Texto.Display" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoPrincipal}" />
+  </Style>
+
+  <Style x:Key="Texto.Titulo1" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoPrincipal}" />
+  </Style>
+
+  <Style x:Key="Texto.Titulo2" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoPrincipal}" />
+  </Style>
+
+  <Style x:Key="Texto.Titulo3" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoPrincipal}" />
+  </Style>
+
+  <Style x:Key="Texto.Cuerpo" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoPrincipal}" />
+  </Style>
+
+  <Style x:Key="Texto.CuerpoEnfatizado" TargetType="TextBlock" BasedOn="{StaticResource Texto.Cuerpo}">
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
+  <Style x:Key="Texto.Caption" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoSecundario}" />
+  </Style>
+
+  <!-- Etiquetas pequeñas de tablas y KPI cards.
+       SIN Typography.Capitals: las versalitas rompen las letras acentuadas
+       (Ñ, Ó, É se dibujan con el acento suelto) porque la fuente no tiene ese
+       glifo — bug reportado por Yuber 2026-07-12. El texto ya va en MAYÚSCULAS
+       desde la vista; el espaciado de letra da el mismo aire visual. -->
+  <Style x:Key="Texto.MicroLabel" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Fuente.Interfaz}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextoTerciario}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Montos: tabular-nums obligatorio para alineación vertical de cifras -->
+  <Style x:Key="Texto.Monto" TargetType="TextBlock" BasedOn="{StaticResource Texto.Cuerpo}">
+    <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+
+  <Style x:Key="Texto.MontoTotal" TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+</ResourceDictionary>

@@ -1,0 +1,92 @@
+<UserControl x:Class="MED100.Views.AlmacenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- Totales (calculados en SQL) -->
+    <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,16">
+      <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+        <StackPanel>
+          <TextBlock Text="PRODUCTOS" Style="{DynamicResource Texto.MicroLabel}" />
+          <Viewbox Style="{DynamicResource Metrica.Valor}">
+            <TextBlock Text="{Binding TotalProductos}" Style="{DynamicResource Texto.Display}" />
+          </Viewbox>
+        </StackPanel>
+      </Border>
+      <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+        <StackPanel>
+          <TextBlock Text="UNIDADES EN STOCK" Style="{DynamicResource Texto.MicroLabel}" />
+          <Viewbox Style="{DynamicResource Metrica.Valor}">
+            <TextBlock Text="{Binding TotalUnidades}" Style="{DynamicResource Texto.Display}" />
+          </Viewbox>
+        </StackPanel>
+      </Border>
+      <Border Style="{DynamicResource Card.Metrica}" Margin="0,0,12,0">
+        <StackPanel>
+          <TextBlock Text="VALOR DEL INVENTARIO" Style="{DynamicResource Texto.MicroLabel}" />
+          <Viewbox Style="{DynamicResource Metrica.Valor}">
+            <TextBlock Text="{Binding ValorInventario, Converter={StaticResource Money}}"
+  Style="{DynamicResource Texto.Display}" />
+          </Viewbox>
+        </StackPanel>
+      </Border>
+      <Border Style="{DynamicResource Card.Metrica}">
+        <StackPanel>
+          <TextBlock Text="CON STOCK BAJO" Style="{DynamicResource Texto.MicroLabel}" />
+          <Viewbox Style="{DynamicResource Metrica.Valor}">
+            <TextBlock Text="{Binding ProductosStockBajo}" Style="{DynamicResource Texto.Display}" />
+          </Viewbox>
+        </StackPanel>
+      </Border>
+    </UniformGrid>
+
+    <TextBox Grid.Row="1" Width="320" HorizontalAlignment="Left" Margin="0,0,0,16"
+             Style="{DynamicResource Input.Texto}"
+             Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+             ToolTip="Buscar por nombre o código" />
+
+    <!-- Solo lectura: el stock se modifica desde Productos o al vender -->
+    <Border Grid.Row="2" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Filas}">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Código" Binding="{Binding CodigoTexto}" Width="Auto" MinWidth="130">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource Fuente.Mono}" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Nombre" Binding="{Binding Nombre}" Width="*" MinWidth="150"
+                              HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+          <DataGridTextColumn Header="Stock" Binding="{Binding Cantidad}" Width="Auto" MinWidth="100">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Precio"
+                              Binding="{Binding Precio, Converter={StaticResource Money}}"
+                              Width="Auto" MinWidth="130">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+          <DataGridTextColumn Header="Valor en stock"
+                              Binding="{Binding ValorStock, Converter={StaticResource Money}}"
+                              Width="Auto" MinWidth="150">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}" />
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </Grid>
+</UserControl>

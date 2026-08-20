@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MED100.ViewModels\MED100.ViewModels.csproj" />
+    <ProjectReference Include="..\MED100.Common\MED100.Common.csproj" />
+    <ProjectReference Include="..\MED100.Printing\MED100.Printing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.5" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ícono de las ventanas. Vive aquí (no en App) porque Views no puede
+         referenciar a App: sería una dependencia circular. -->
+    <Resource Include="Assets\med100.ico" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
