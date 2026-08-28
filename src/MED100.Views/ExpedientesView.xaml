@@ -1,4 +1,4 @@
-<UserControl x:Class="MED100.Views.ExpedientesView"
+﻿<UserControl x:Class="MED100.Views.ExpedientesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
@@ -15,6 +15,7 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
@@ -28,8 +29,25 @@
                  Text="Acá se guardan los papeles que el paciente entrega: cédula, carné de la ARS, consentimientos, referimientos y estudios que trajo. Son datos sensibles: cada apertura y cada borrado quedan registrados con nombre y hora, y solo el Administrador puede eliminar un documento." />
     </Border>
 
+    <!-- Aviso de los que dejaron de venir. Solo aparece si hay alguno y si el
+         aviso está prendido en Configuración. -->
+    <Border Grid.Row="1" Background="{DynamicResource Brush.PorVencer.Fondo}" CornerRadius="8"
+            Padding="14,10" Margin="0,0,0,14"
+            Visibility="{Binding HayInactivos, Converter={StaticResource BoolAVisibilidad}}">
+      <TextBlock Text="{Binding InactivosTexto}" TextWrapping="Wrap" FontSize="12.5"
+                 Foreground="{DynamicResource Brush.PorVencer.Texto}" />
+    </Border>
+
     <!-- Toolbar -->
-    <DockPanel Grid.Row="1" Margin="0,0,0,14">
+    <DockPanel Grid.Row="2" Margin="0,0,0,14">
+      <!-- Los que dejaron de venir (pedido del cliente 2026-08-25). El filtro va
+           acá y no en una pantalla aparte: la lista ya tiene el nombre, el
+           teléfono y la última visita, que es exactamente lo que hace falta
+           para levantar el teléfono y llamarlos. -->
+      <CheckBox DockPanel.Dock="Right" Content="Los que dejaron de venir"
+                VerticalAlignment="Center" Margin="16,0,0,0"
+                IsChecked="{Binding SoloInactivos, Mode=TwoWay}"
+                ToolTip="Pacientes que hace meses que no vienen. El corte se cambia en Configuración." />
       <CheckBox DockPanel.Dock="Right" Content="Solo con expediente"
                 VerticalAlignment="Center" Margin="16,0,0,0"
                 IsChecked="{Binding SoloConDocumentos, Mode=TwoWay}"
@@ -40,7 +58,7 @@
                ToolTip="Buscar por nombre, cédula o teléfono" />
     </DockPanel>
 
-    <Border Grid.Row="2" Style="{DynamicResource Card}" Padding="0">
+    <Border Grid.Row="3" Style="{DynamicResource Card}" Padding="0">
       <DataGrid Style="{DynamicResource Tabla}" ItemsSource="{Binding Filas}"
                 SelectedItem="{Binding Seleccionada}">
         <!-- Doble clic abre el expediente: es lo que la gente intenta primero -->
@@ -79,9 +97,23 @@
                               ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
           <DataGridTextColumn Header="Facturas" Binding="{Binding FacturasTexto}" Width="Auto" MinWidth="100"
                               ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+          <!-- La última visita se pinta de ámbar cuando el paciente dejó de
+               venir, con cuánto hace en el tooltip. Marcar la fecha y no una
+               columna nueva mantiene la tabla del mismo ancho. -->
           <DataGridTextColumn Header="Última visita" Binding="{Binding UltimaVisitaTexto}"
-                              Width="Auto" MinWidth="140"
-                              ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+                              Width="Auto" MinWidth="140">
+            <DataGridTextColumn.ElementStyle>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Tabla.Texto.Centrado}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding DejoDeVenir}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.PorVencer.Texto}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                    <Setter Property="ToolTip" Value="{Binding InactividadTexto}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </DataGridTextColumn.ElementStyle>
+          </DataGridTextColumn>
           <DataGridTemplateColumn Header="" Width="150">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate>
@@ -96,7 +128,7 @@
       </DataGrid>
     </Border>
 
-    <TextBlock Grid.Row="3" Text="{Binding ResumenTexto}"
+    <TextBlock Grid.Row="4" Text="{Binding ResumenTexto}"
                Style="{DynamicResource Texto.Caption}" Margin="4,10,0,0" />
   </Grid>
 </UserControl>

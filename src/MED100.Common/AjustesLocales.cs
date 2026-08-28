@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -35,9 +35,23 @@ public class AjustesLocales
     /// <summary>Ids de productos silenciados con "No volver a avisar".</summary>
     public List<long> AvisoProductosSilenciados { get; set; } = [];
 
+    // Paciente que dejó de venir (pedido del cliente 2026-08-25):
+    //   "quiero que de si se puede una especie de alerta cuando un paciente
+    //    dure más de 6 meses sin ser atendido"
+    // Se cuenta desde la ÚLTIMA VISITA, que ya existía: la última cita atendida
+    // o la última factura, lo que sea más reciente (ResumenExpediente).
+    public bool AvisoPacienteInactivoActivo { get; set; } = true;
+    /// <summary>Meses sin venir a partir de los cuales el paciente se marca. 6 es lo pedido.</summary>
+    public int AvisoPacienteInactivoMeses { get; set; } = 6;
+
     // Impresión y ticket (spec §8.3.G — preferencia por terminal)
     public string? ImpresoraPredeterminada { get; set; }
-    public string TamanoPapel { get; set; } = "80mm";      // 80mm | Carta
+    // TamanoPapel se quitó el 2026-08-28: estaba declarado y NO se leía en
+    // ninguna parte. El único documento con dos tamaños es el cierre de caja,
+    // y ese ya tiene su propio selector en la pantalla (CuadreViewModel).
+    // Un ajuste que aparece en ajustes.json y no hace nada es peor que no
+    // tenerlo: invita a cambiarlo y a creer que surtió efecto.
+    // Los ajustes.json que todavía traigan la clave la ignoran sin romperse.
     public int CopiasTicket { get; set; } = 1;
     public string? TicketEncabezado { get; set; }
     /// <summary>OFF (default): al cobrar se imprime directo sin preguntar (pedido Yuber 2026-07-12).</summary>

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -31,8 +31,13 @@ public static class ExportadorPdf
     /// <summary>96 DPI de WPF × 2. Nítido al ampliar, y el archivo pesa poco.</summary>
     private const double Escala = 2.0;
 
-    /// <summary>Ancho del papel térmico. El alto sale proporcional al contenido.</summary>
-    private const double AnchoPapelMm = 80;
+    // El tamaño de la página se DERIVA del visual (DIU de WPF → puntos de PDF)
+    // en vez de fijarse a 80mm. Los visuales de MED-100 no son todos del ancho
+    // del papel térmico: CierreVisualFactory arma 794 DIU (210mm) cuando el
+    // usuario elige Carta, y con el ancho fijo ese cierre saldría en una tira
+    // de 8cm con el contenido de una hoja entera encogido adentro. Es el mismo
+    // defecto que estaba en FAControl y que allá sí llegó a manos del cliente
+    // (facturas de venta y fichas de vehículo guardadas en 80mm).
 
     /// <summary>
     /// Guarda el visual como PDF en <paramref name="rutaDestino"/>.
@@ -84,9 +89,12 @@ public static class ExportadorPdf
             pdf.Info.Title = titulo;
             pdf.Info.Creator = "MED-100";
 
+            // DIU (96 por pulgada) → puntos (72 por pulgada). Un ticket de 302
+            // DIU da 80mm, que es lo que salía antes; un cierre en Carta da su
+            // tamaño real en vez de encogerse.
             var pagina = pdf.AddPage();
-            pagina.Width = XUnit.FromMillimeter(AnchoPapelMm);
-            pagina.Height = XUnit.FromMillimeter(AnchoPapelMm * alto / ancho);
+            pagina.Width = XUnit.FromPoint(ancho * 72.0 / 96.0);
+            pagina.Height = XUnit.FromPoint(alto * 72.0 / 96.0);
 
             using (var grafico = XGraphics.FromPdfPage(pagina))
             using (var imagen = XImage.FromFile(rutaPng))

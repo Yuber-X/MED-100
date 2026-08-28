@@ -1,4 +1,4 @@
-# TODO — MED-100
+﻿# TODO — MED-100
 
 > Estado vivo del proyecto. Actualizar al cierre de cada bloque de trabajo.
 
@@ -136,6 +136,51 @@ recepcionistas a la vez: el `FOR UPDATE` sobre un rango vacío toma un gap lock 
 varias transacciones lo consiguen y todas se traban al insertar. Reproducido con el test de
 10 turnos en paralelo. Ahora es un solo `INSERT … SELECT MAX(numero)+1` con reintento, y la
 unicidad la garantiza `uq_turno_fecha_numero`, no el bloqueo.
+
+## Pedidos de la clinica del 2026-08-25 (screenshots en Claude Active)
+
+- [x] "Paciente" -> "Nombre" en turnos (columna, campo, boton y ticket impreso).
+      Se uso Title Case como el resto de la app; CONFIRMAR con el cliente si lo
+      queria en MAYUSCULAS
+- [x] Aviso de pacientes que dejaron de venir: franja + filtro "Los que dejaron
+      de venir" en Expedientes + marca en la fecha + ajuste del corte en
+      Configuracion. La regla en `CalculadoraInactividad` (Services) con 8 tests
+- [x] Fuga de handles del spooler en `ImprimirDirecto` (PrintQueue/PrintServer
+      nunca se liberaban). Corregido tambien en FAControl, que comparte el codigo
+- [x] `ExportadorPdf` fijaba 80mm; ahora deriva el tamano del visual
+- [x] `AjustesLocales.TamanoPapel` estaba muerto: se quito
+- [x] `docs/IMPRESORA-TERMICA.md` para diagnosticar la 2CONNET por AnyDesk
+
+### Bloqueado por el cliente
+- [ ] **Colores de la clinica.** La paleta ya esta extraida del .ai que mando
+      (`#0396D4` primario, `#29DAE2` acento, `#100062` navy). Son 4 valores en
+      `Themes/Colores.xaml`. FALTA que el cliente confirme — la pregunta
+      "cuales colores desea?" nunca la contesto
+- [ ] **Nombre nuevo del producto.** El .ai se llama "logo odonto union", pero
+      eso es inferencia. FALTA confirmacion. Al renombrar NO tocar:
+      `AppId` del instalador, `%ProgramData%\MED-100\licencia.dat`
+      (AnclaLicencia), los namespaces `MED100.*` ni la base `med100_db`
+- [ ] **Recetas y consentimiento informado.** Faltan las plantillas ("tengo que
+      dartelo") Y una decision de alcance: imprimir una receta es contenido
+      clinico, y CLAUDE.md §1.1 dice que MED-100 es recepcion, no el expediente
+      medico. Decidir explicitamente antes de escribir codigo
+- [ ] **Impresora 2CONNET.** Diagnostico escrito; falta ejecutarlo en la PC de
+      la clinica y confirmar
+
+### Pendiente de probar a mano
+- [ ] Turnos: la columna y el campo dicen "Nombre", y el papelito impreso tambien
+- [ ] Expedientes: la franja ambar aparece solo si hay inactivos
+- [ ] El filtro "Los que dejaron de venir" deja la lista de a quien llamar
+- [ ] Un paciente que nunca vino NO aparece como inactivo
+- [ ] Cambiar el corte de meses en Configuracion y ver que la lista cambia
+- [ ] Imprimir muchos tickets seguidos y confirmar que el spooler no se degrada
+
+### Deuda conocida (no bloquea)
+- [ ] El cierre de caja en Carta usa `PrintVisual`, que NO pagina: con 4+ cajeros
+      el contenido puede pasarse de la hoja y recortarse sin avisar. Es el mismo
+      defecto que fue el BLOCKER del pagare en FAControl. En una clinica con 1-3
+      recepcionistas el riesgo es bajo; si aparece, migrar a FlowDocument como se
+      hizo alla (`PrestamoDocumentFactory` es el modelo)
 
 ## Facturación de clínica (HECHO — falta prueba manual)
 - [x] Una línea es un PROCEDIMIENTO o un INSUMO; el buscador ofrece los dos juntos

@@ -1,6 +1,66 @@
-# Changelog — MED-100
+﻿# Changelog — MED-100
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.0.0/). Fechas en hora de República Dominicana.
+
+## [No publicado] — Pedidos de la clínica del 2026-08-25
+
+### Added
+- **Aviso de pacientes que dejaron de venir.** Pedido del cliente: *"quiero que
+  de si se puede una especie de alerta cuando un paciente dure más de 6 meses
+  sin ser atendido"*.
+
+  No se hizo como un contador suelto sino como algo accionable: en Expedientes
+  aparece una franja con cuántos son, un filtro **"Los que dejaron de venir"**
+  que deja en pantalla exactamente la lista de a quién llamar —con nombre,
+  teléfono y última visita— y la fecha de la última visita marcada en ámbar con
+  el tiempo exacto en el tooltip. El corte (6 meses por defecto) se cambia en
+  Configuración.
+
+  La regla vive en `CalculadoraInactividad`, en Services: es de negocio —a quién
+  llama la clínica— y no de presentación, así que tiene sus propias pruebas.
+  **El que nunca vino NO se marca**: es un paciente nuevo, no uno que se perdió,
+  y mezclarlos llenaría la lista de gente a la que no hay por qué llamar.
+
+### Changed
+- **"Paciente" pasa a "Nombre"** en la pantalla de turnos y en el papelito
+  impreso (pedido del cliente). Se cambiaron los 4 textos visibles; los bindings
+  (`PacienteTexto`, `AsignarPacienteCommand`…) quedaron intactos porque son
+  identificadores de código.
+
+  Se usó "Nombre" y no "NOMBRE": el cliente lo escribió en mayúsculas por
+  énfasis en WhatsApp, pero toda la aplicación usa Title Case —"Turno",
+  "Médico", "Llegó", "Espera"— y en mayúsculas gritaría entre las demás.
+  **Pendiente de confirmar con el cliente.**
+
+### Fixed
+- **Fuga de handles del spooler de Windows.** `ImprimirDirecto` creaba un
+  `PrintQueue` y un `PrintServer` por cada ticket y no los liberaba, siendo los
+  dos `IDisposable`. En una clínica que imprime todo el día se acumulan hasta
+  que el spooler empieza a fallar, y el síntoma —"de repente dejó de
+  imprimir"— aparece horas después y lejos de la causa. (El mismo defecto
+  estaba en FAControl, que comparte este código; se corrigió allá también.)
+
+- **`ExportadorPdf` fijaba el ancho de página a 80 mm.** Hoy solo se lo llama
+  con tickets, así que no llegó a fallar, pero `CierreVisualFactory` arma
+  visuales de 794 DIU (hoja carta): el día que se exportara ese cierre saldría
+  en una tira de 8 cm con el contenido encogido adentro. Es exactamente lo que
+  sí pasó en FAControl con las facturas de venta. Ahora el tamaño de la página
+  se deriva del visual.
+
+- **`AjustesLocales.TamanoPapel` no hacía nada.** Estaba declarado y aparecía en
+  `ajustes.json`, pero no se leía en ninguna parte: el único documento con dos
+  tamaños es el cierre de caja, que ya tiene su propio selector en pantalla. Se
+  quitó — un ajuste que invita a cambiarlo y no surte efecto es peor que no
+  tenerlo. Los `ajustes.json` que aún traigan la clave la ignoran sin romperse.
+
+### Docs
+- **`docs/IMPRESORA-TERMICA.md`**: diagnóstico paso a paso de la 2CONNET
+  PC580-01 V6 que *"imprime un reguero de números y cosas raras"*. No es un
+  error de MED-100: la aplicación imprime por GDI y necesita un driver gráfico;
+  contra una cola `Generic / Text Only` la impresora recibe los bytes de la
+  imagen y los imprime como caracteres. La guía incluye la comprobación que
+  separa las aguas (si el Bloc de notas imprime bien y MED-100 no, es el driver)
+  y qué datos levantar si aun así falla.
 
 ## [1.0.1] — 2026-07-12
 

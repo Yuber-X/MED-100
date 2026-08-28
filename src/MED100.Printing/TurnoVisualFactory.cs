@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -49,7 +49,7 @@ public static class TurnoVisualFactory
         // Solo se imprime lo que se sabe. Un turno que se dio en la puerta no
         // tiene paciente ni médico todavía, y dejar "—" impreso no aporta nada.
         if (!string.IsNullOrWhiteSpace(turno.PacienteNombre))
-            panel.Children.Add(Fila("Paciente:", turno.PacienteNombre));
+            panel.Children.Add(Fila("Nombre:", turno.PacienteNombre));
         if (!string.IsNullOrWhiteSpace(turno.MedicoNombre))
             panel.Children.Add(Fila("Médico:", turno.MedicoNombre));
 

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,7 +10,12 @@ using Serilog;
 namespace MED100.ViewModels;
 
 /// <summary>Fila del almacén: un paciente y el estado de su expediente.</summary>
-public record ExpedienteFila(ResumenExpediente Resumen)
+/// <param name="MesesInactividad">
+/// Desde cuántos meses sin venir se considera que el paciente dejó de venir.
+/// Viaja por parámetro y no se lee de los ajustes acá adentro: la fila es un
+/// record de presentación y no debe saber de configuración.
+/// </param>
+public record ExpedienteFila(ResumenExpediente Resumen, int MesesInactividad = 6)
 {
     private static readonly CultureInfo CulturaRd = CultureInfo.GetCultureInfo("es-DO");
 
@@ -35,6 +40,18 @@ public record ExpedienteFila(ResumenExpediente Resumen)
     public string UltimoDocumentoTexto => Resumen.UltimoDocumentoUtc is { } d
         ? FechaNegocio.AUtcLocal(d).ToString("dd/MM/yyyy", CulturaRd)
         : "—";
+
+    /// <summary>
+    /// Hace más de <see cref="MesesInactividad"/> que no viene (pedido 2026-08-25).
+    /// La regla vive en <see cref="CalculadoraInactividad"/>: es de negocio —a
+    /// quién llama la clínica— y tiene sus propias pruebas.
+    /// </summary>
+    public bool DejoDeVenir =>
+        CalculadoraInactividad.DejoDeVenir(Resumen.UltimaVisitaUtc, DateTime.UtcNow, MesesInactividad);
+
+    /// <summary>Cuánto hace que no viene, en palabras. Vacío si no dejó de venir.</summary>
+    public string InactividadTexto =>
+        CalculadoraInactividad.Describir(Resumen.UltimaVisitaUtc, DateTime.UtcNow, MesesInactividad);
 }
 
 /// <summary>
@@ -51,27 +68,41 @@ public partial class ExpedientesViewModel : ObservableObject, IPaginaAsincrona
 {
     private readonly ExpedienteService _expedientes;
     private readonly IDialogService _dialogos;
+    private readonly AjustesLocales _ajustes;
     private IReadOnlyList<ResumenExpediente> _todos = [];
 
     /// <summary>El shell abre el expediente de ese paciente.</summary>
     public event Action<long>? ExpedienteSolicitado;
 
-    public ExpedientesViewModel(ExpedienteService expedientes, IDialogService dialogos)
+    public ExpedientesViewModel(ExpedienteService expedientes, IDialogService dialogos,
+        AjustesLocales ajustes)
     {
         _expedientes = expedientes;
         _dialogos = dialogos;
+        _ajustes = ajustes;
     }
 
     public ObservableCollection<ExpedienteFila> Filas { get; } = [];
 
     [ObservableProperty] private string _busqueda = string.Empty;
     [ObservableProperty] private bool _soloConDocumentos;
+    /// <summary>
+    /// "Los que dejaron de venir" (pedido 2026-08-25). Es el filtro que
+    /// convierte la alerta en algo accionable: la lista de a quién llamar.
+    /// </summary>
+    [ObservableProperty] private bool _soloInactivos;
+    /// <summary>Cuántos pacientes dejaron de venir, con el corte configurado.</summary>
+    [ObservableProperty] private int _inactivos;
+    [ObservableProperty] private string _inactivosTexto = string.Empty;
+    /// <summary>Manda si la franja de aviso se muestra: hay inactivos Y el aviso está prendido.</summary>
+    public bool HayInactivos => Inactivos > 0 && _ajustes.AvisoPacienteInactivoActivo;
     [ObservableProperty] private string _resumenTexto = string.Empty;
     [ObservableProperty] private ExpedienteFila? _seleccionada;
     [ObservableProperty] private bool _ocupado;
 
     partial void OnBusquedaChanged(string value) => AplicarFiltro();
     partial void OnSoloConDocumentosChanged(bool value) => AplicarFiltro();
+    partial void OnSoloInactivosChanged(bool value) => AplicarFiltro();
 
     public async Task RefrescarAsync()
     {
@@ -99,17 +130,32 @@ public partial class ExpedientesViewModel : ObservableObject, IPaginaAsincrona
 
     private void AplicarFiltro()
     {
+        var meses = Math.Max(1, _ajustes.AvisoPacienteInactivoMeses);
         var filtro = Busqueda.Trim();
-        var visibles = _todos.Where(r =>
-            (!SoloConDocumentos || r.Documentos > 0) &&
+
+        // Se arman TODAS las filas primero: el conteo de inactivos es sobre la
+        // cartera entera, no sobre lo que quedó visible. Si contara lo filtrado,
+        // buscar un nombre haría "desaparecer" a los demás inactivos.
+        var todasLasFilas = _todos.Select(r => new ExpedienteFila(r, meses)).ToList();
+
+        var visibles = todasLasFilas.Where(f =>
+            (!SoloConDocumentos || f.Resumen.Documentos > 0) &&
+            (!SoloInactivos || f.DejoDeVenir) &&
             (filtro.Length == 0 ||
-             r.Nombre.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
-             (r.Cedula?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false) ||
-             (r.Telefono?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false)));
+             f.Resumen.Nombre.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
+             (f.Resumen.Cedula?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false) ||
+             (f.Resumen.Telefono?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false)));
 
         Filas.Clear();
-        foreach (var r in visibles)
-            Filas.Add(new ExpedienteFila(r));
+        foreach (var f in visibles)
+            Filas.Add(f);
+
+        Inactivos = todasLasFilas.Count(f => f.DejoDeVenir);
+        InactivosTexto = Inactivos == 0
+            ? string.Empty
+            : $"{Inactivos} paciente(s) llevan más de {meses} meses sin venir. " +
+              "Marcá \"Los que dejaron de venir\" para verlos.";
+        OnPropertyChanged(nameof(HayInactivos));
 
         var conPapeles = _todos.Count(r => r.Documentos > 0);
         var papeles = _todos.Sum(r => r.Documentos);

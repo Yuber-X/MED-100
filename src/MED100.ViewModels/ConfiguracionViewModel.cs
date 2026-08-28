@@ -110,6 +110,8 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
         _hayAppPasswordGuardada = !string.IsNullOrWhiteSpace(ajustes.GmailAppPasswordCifrada);
         _recordatorioCitasActivo = ajustes.RecordatorioCitasActivo;
         _recordatorioCitasHorasTexto = ajustes.RecordatorioCitasHorasAntes.ToString(CultureInfo.InvariantCulture);
+        _avisoPacienteInactivoActivo = ajustes.AvisoPacienteInactivoActivo;
+        _avisoPacienteInactivoMesesTexto = ajustes.AvisoPacienteInactivoMeses.ToString(CultureInfo.InvariantCulture);
         _ultimoAvisoTexto = ajustes.UltimoRecordatorioUtc is { } f
             ? $"Ultimo envio: {FechaNegocio.AUtcLocal(f):dd/MM/yyyy hh:mm tt}"
             : "Todavia no se envio ningun aviso.";
@@ -527,6 +529,28 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
 
     partial void OnRecordatorioCitasActivoChanged(bool value) => GuardarAjustesCorreo();
     partial void OnRecordatorioCitasHorasTextoChanged(string value) => GuardarAjustesCorreo();
+
+    // ---------- Paciente que dejó de venir (pedido del cliente 2026-08-25) ----------
+    [ObservableProperty] private bool _avisoPacienteInactivoActivo = true;
+    [ObservableProperty] private string _avisoPacienteInactivoMesesTexto = "6";
+
+    partial void OnAvisoPacienteInactivoActivoChanged(bool value) => GuardarAvisoInactivo();
+    partial void OnAvisoPacienteInactivoMesesTextoChanged(string value) => GuardarAvisoInactivo();
+
+    /// <summary>
+    /// Va aparte de GuardarAjustesCorreo: este aviso NO manda correo, se ve
+    /// dentro de la aplicación (en Expedientes). Mezclarlos haría que tocar el
+    /// corte de meses reescribiera la configuración de Gmail.
+    /// </summary>
+    private void GuardarAvisoInactivo()
+    {
+        _ajustes.AvisoPacienteInactivoActivo = AvisoPacienteInactivoActivo;
+        // Si escriben cualquier cosa se deja el valor anterior: cero meses
+        // marcaría a TODO el mundo como perdido apenas sale por la puerta.
+        if (int.TryParse(AvisoPacienteInactivoMesesTexto, out var meses) && meses > 0)
+            _ajustes.AvisoPacienteInactivoMeses = Math.Clamp(meses, 1, 60);
+        _ajustes.Guardar();
+    }
 
     partial void OnRecordatoriosActivosChanged(bool value) => GuardarAjustesCorreo();
     partial void OnRecordatoriosAutomaticosChanged(bool value) => GuardarAjustesCorreo();
