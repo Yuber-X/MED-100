@@ -58,7 +58,11 @@ public partial class MainViewModel : ObservableObject
     private static readonly Dictionary<Pagina, string> Titulos = new()
     {
         [Pagina.Panel] = "Panel",
-        [Pagina.Vender] = "Vender",
+        // El cliente lo llama COBRAR (2026-08-28): "al botón vender vamos a
+        // llamarle Cobrar". Solo cambia el rótulo — el enum Pagina.Vender y el
+        // permiso "vender" siguen igual: son identificadores, y renombrarlos
+        // obligaría a migrar la tabla de permisos por un cambio de palabra.
+        [Pagina.Vender] = "Cobrar",
         [Pagina.Clientes] = "Pacientes",
         [Pagina.Medicos] = "Médicos",
         [Pagina.Procedimientos] = "Procedimientos",

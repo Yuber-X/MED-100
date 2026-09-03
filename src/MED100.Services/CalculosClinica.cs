@@ -1,4 +1,4 @@
-using MED100.Models;
+﻿using MED100.Models;
 
 namespace MED100.Services;
 
@@ -25,6 +25,12 @@ public static class CalculosClinica
     {
         var subtotal = lineas.Sum(l => l.Subtotal);
         var baseGravada = lineas.Where(l => !l.Exento).Sum(l => l.Subtotal);
+        // La rebaja NO se descuenta acá: ya está adentro del precio de cada
+        // línea. Se suma solo para poder IMPRIMIRLA. Hacerlo al revés —cobrar
+        // el de lista y restar un descuento global al final— obligaría a
+        // repartir esa resta entre lo exento y lo gravado para saber sobre qué
+        // se calcula el ITBIS, y esa repartición es una decisión que nadie tomó.
+        var descuento = lineas.Sum(l => l.Descuento);
 
         var itbis = Math.Round(baseGravada * itbisTasa / 100m, 2, MidpointRounding.AwayFromZero);
         var total = subtotal + itbis;
@@ -36,7 +42,7 @@ public static class CalculosClinica
             _ => total   // centavo: subtotal e itbis ya están a 2 decimales
         };
 
-        return new VentaTotales(subtotal, itbisTasa, itbis, total, baseGravada);
+        return new VentaTotales(subtotal, itbisTasa, itbis, total, baseGravada, descuento);
     }
 
     /// <summary>

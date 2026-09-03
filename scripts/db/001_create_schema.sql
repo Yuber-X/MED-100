@@ -1,4 +1,4 @@
--- =============================================================
+﻿-- =============================================================
 -- MED-100 — Esquema inicial
 -- Script: 001_create_schema.sql
 -- Motor: MySQL 8.0+ · InnoDB · utf8mb4_unicode_ci
@@ -249,6 +249,13 @@ CREATE TABLE cliente (
   direccion        VARCHAR(250) NULL,
   -- Quién lo refirió (procedencia). NULL = llegó por su cuenta.
   referidor_id     BIGINT UNSIGNED NULL,
+  -- Última consulta ANTES de usar MED-100, cargada a mano al pasar los
+  -- pacientes viejos al sistema (pedido de la clínica 2026-08-27). Sin esto,
+  -- el aviso de "dejó de venir" no serviría hasta dentro de 6 meses de uso:
+  -- todos los pacientes migrados figuran como si nunca hubieran venido.
+  -- Es un PISO, no la verdad: si el paciente tiene actividad real en el
+  -- sistema y es más reciente, gana la real.
+  ultima_visita_previa DATE     NULL,
   notas            TEXT         NULL,
   created_at       DATETIME     NOT NULL DEFAULT (UTC_TIMESTAMP()),
   updated_at       DATETIME     NULL,
@@ -378,7 +385,13 @@ CREATE TABLE detalle (
   producto_id      BIGINT UNSIGNED NULL,
   descripcion      VARCHAR(200)  NOT NULL,       -- nombre al momento de facturar
   cantidad         INT           NOT NULL,
-  precio_unitario  DECIMAL(15,2) NOT NULL,       -- precio al momento de la venta
+  precio_unitario  DECIMAL(15,2) NOT NULL,       -- lo que se COBRÓ
+  -- Precio de lista del tarifario al momento de facturar. NULL = se cobró el
+  -- de lista. Existe para que la rebaja quede documentada en la factura: sin
+  -- esto, un procedimiento cobrado a 4,000 en vez de 5,000 es indistinguible
+  -- de uno que siempre valió 4,000, y el "Descuento" del ticket no se podría
+  -- reconstruir después. Se congela igual que exento_itbis.
+  precio_catalogo  DECIMAL(15,2) NULL,
   exento_itbis     TINYINT(1)    NOT NULL,     -- sin default a propósito: siempre explícito
   subtotal         DECIMAL(15,2) NOT NULL,       -- cantidad * precio_unitario
   PRIMARY KEY (id),

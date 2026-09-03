@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MED100.Models;
 using MED100.Services;
 
@@ -228,5 +228,118 @@ public class CalculosClinicaTests
         var reparto = CalculosClinica.CalcularReparto(1500m, 3, "SeNaSa", "AUT-1", 1500m);
 
         reparto.PacientePaga.Should().Be(0m);
+    }
+
+    // =========================================================
+    // Rebaja de precio (pedido de la clínica 2026-08-27)
+    //
+    // La rebaja NO es una resta al final: es un precio más bajo en la línea.
+    // De ahí sale que no haya que decidir si va antes o después del ITBIS ni
+    // cómo repartirla entre lo exento y lo gravado — las dos preguntas que
+    // hacen ambiguo un "descuento global".
+    // =========================================================
+
+    private static VentaLinea ConsultaRebajada(decimal cobrado, decimal lista, int cantidad = 1) =>
+        new(null, "Consulta general", cantidad, cobrado, Exento: true,
+            ProcedimientoId: 1, PrecioCatalogo: lista);
+
+    private static VentaLinea InsumoRebajado(decimal cobrado, decimal lista, int cantidad = 1) =>
+        new(10, "Gasa estéril", cantidad, cobrado, Exento: false,
+            ProcedimientoId: null, PrecioCatalogo: lista);
+
+    [Fact]
+    public void Rebaja_SinTocarElPrecio_NoHayDescuento()
+    {
+        var totales = CalculosClinica.CalcularTotales([Consulta()], 18m, ModoRedondeo.Centavo);
+
+        totales.Descuento.Should().Be(0m);
+        totales.HuboRebaja.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Rebaja_SeCobraElPrecioRebajado_NoElDeLista()
+    {
+        var totales = CalculosClinica.CalcularTotales(
+            [ConsultaRebajada(cobrado: 4000m, lista: 5000m)], 18m, ModoRedondeo.Centavo);
+
+        totales.Subtotal.Should().Be(4000m, "el subtotal es lo que se cobra");
+        totales.Total.Should().Be(4000m);
+        totales.Descuento.Should().Be(1000m);
+        totales.SubtotalSinRebaja.Should().Be(5000m, "es lo que se imprime arriba del descuento");
+    }
+
+    [Fact]
+    public void Rebaja_SeMultiplicaPorLaCantidad()
+    {
+        var totales = CalculosClinica.CalcularTotales(
+            [ConsultaRebajada(cobrado: 4000m, lista: 5000m, cantidad: 3)], 18m, ModoRedondeo.Centavo);
+
+        totales.Descuento.Should().Be(3000m);
+        totales.Subtotal.Should().Be(12_000m);
+    }
+
+    /// <summary>
+    /// LA razón de hacerlo por línea. El ITBIS sale del precio REBAJADO: cobrar
+    /// el impuesto sobre el precio de lista le haría pagar al paciente 18% de
+    /// una plata que nadie le cobró.
+    /// </summary>
+    [Fact]
+    public void Rebaja_ElItbisSaleDelPrecioQueSeCOBRA()
+    {
+        var totales = CalculosClinica.CalcularTotales(
+            [InsumoRebajado(cobrado: 80m, lista: 100m)], 18m, ModoRedondeo.Centavo);
+
+        totales.BaseGravada.Should().Be(80m);
+        totales.Itbis.Should().Be(14.40m, "18% de 80, no de 100");
+        totales.Total.Should().Be(94.40m);
+    }
+
+    /// <summary>
+    /// Con exento y gravado mezclados no hay nada que repartir: cada línea ya
+    /// lleva su propio precio. Es el caso que un descuento global obligaría a
+    /// prorratear, y prorratear mal mueve el ITBIS.
+    /// </summary>
+    [Fact]
+    public void Rebaja_ConExentoYGravadoMezclados_CadaUnoVaPorSuCuenta()
+    {
+        var totales = CalculosClinica.CalcularTotales(
+            [ConsultaRebajada(cobrado: 1200m, lista: 1500m),
+             InsumoRebajado(cobrado: 80m, lista: 100m)],
+            18m, ModoRedondeo.Centavo);
+
+        totales.Subtotal.Should().Be(1280m);
+        totales.BaseGravada.Should().Be(80m, "la consulta sigue exenta aunque se rebaje");
+        totales.Itbis.Should().Be(14.40m);
+        totales.Descuento.Should().Be(320m, "300 de la consulta + 20 de la gasa");
+    }
+
+    /// <summary>
+    /// Cobrar MÁS que el precio de lista no es un descuento negativo. Sin este
+    /// tope, un recargo restaría del descuento de otra línea y el ticket
+    /// mostraría una rebaja menor de la que se hizo.
+    /// </summary>
+    [Fact]
+    public void Rebaja_CobrarPorEncimaDelDeLista_NoEsUnDescuentoNegativo()
+    {
+        var totales = CalculosClinica.CalcularTotales(
+            [ConsultaRebajada(cobrado: 6000m, lista: 5000m)], 18m, ModoRedondeo.Centavo);
+
+        totales.Descuento.Should().Be(0m);
+        totales.Subtotal.Should().Be(6000m, "se cobra lo que se puso");
+    }
+
+    /// <summary>
+    /// El honorario del médico también sale de lo REBAJADO. Si saliera del
+    /// precio de lista, la clínica pagaría porcentaje sobre plata que no
+    /// entró — y con una rebaja grande podría pagar más de lo que cobró.
+    /// </summary>
+    [Fact]
+    public void Rebaja_ElHonorarioDelMedicoSaleDeLoQueSeCOBRA()
+    {
+        var honorario = CalculosClinica.CalcularHonorario(
+            [ConsultaRebajada(cobrado: 4000m, lista: 5000m)], 7, "Dra. Almonte", 40m);
+
+        honorario.Base.Should().Be(4000m);
+        honorario.Monto.Should().Be(1600m, "40% de 4,000 y no de 5,000");
     }
 }

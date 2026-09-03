@@ -1,4 +1,4 @@
-<Window x:Class="MED100.App.MainWindow"
+﻿<Window x:Class="MED100.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MED100.ViewModels;assembly=MED100.ViewModels"
@@ -114,8 +114,8 @@
                                    ConverterParameter={x:Static vm:Pagina.Panel}}"
                        Command="{Binding NavegarCommand}"
                        CommandParameter="{x:Static vm:Pagina.Panel}" />
-          <RadioButton Content="Vender" Tag="&#xE7BF;" Style="{DynamicResource Sidebar.Item}"
-                       ToolTip="Cobrar. Se arma la factura con procedimientos e insumos, se elige el médico y el seguro, y sale el recibo."
+          <RadioButton Content="Cobrar" Tag="&#xE7BF;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Se arma la factura con procedimientos e insumos, se elige el médico y el seguro, y sale el recibo."
                        Visibility="{Binding PuedeVerVender, Converter={StaticResource BoolAVisibilidad}}"
                        IsChecked="{Binding PaginaActual, Mode=OneWay,
                                    Converter={StaticResource Igualdad},

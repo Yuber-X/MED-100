@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 using MED100.Common;
 using MED100.Models;
 
@@ -85,7 +85,11 @@ public class DocumentoPacienteRepository
                      COALESCE((SELECT MAX(ci.fecha_hora) FROM {DbNames.Cita} ci
                                 WHERE ci.cliente_id = c.id AND ci.estado = 'atendida'), '1000-01-01'),
                      COALESCE((SELECT MAX(f.fecha_emision) FROM {DbNames.Factura} f
-                                WHERE f.cliente_id = c.id AND f.estado = 'emitida'), '1000-01-01')
+                                WHERE f.cliente_id = c.id AND f.estado = 'emitida'), '1000-01-01'),
+                     -- La que cargó la recepción al pasar el paciente al sistema.
+                     -- Entra como una candidata más: si hay actividad real
+                     -- posterior, GREATEST la elige sola y no hay que borrar nada.
+                     COALESCE(c.ultima_visita_previa, '1000-01-01')
                    ) AS ultima_visita
             FROM {DbNames.Cliente} c
             WHERE c.deleted_at IS NULL

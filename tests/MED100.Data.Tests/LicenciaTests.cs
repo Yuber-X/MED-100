@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Data;
 
@@ -185,6 +185,114 @@ public class LicenciaTests : IAsyncLifetime
         problema.Should().BeNull();
         (await _repo.ObtenerAsync(Instalacion)).Activada.Should().BeTrue(
             "arrancar la app no puede desactivar una licencia ya pagada");
+    }
+
+    // =========================================================
+    // Los parches de apertura (migraciones 009 y 010)
+    //
+    // La app los corre sola en cada arranque para que actualizar no obligue a
+    // nadie a abrir Workbench. Si acá falla algo, la clínica abre la app y le
+    // revienta la ficha del paciente o el cobro, sin ninguna pista de por qué.
+    // =========================================================
+
+    [Theory]
+    [InlineData("cliente", "ultima_visita_previa")]
+    [InlineData("detalle", "precio_catalogo")]
+    public async Task ActualizarEsquemaAsync_AgregaLasColumnasQueFaltan(string tabla, string columna)
+    {
+        // Una instalación anterior: la columna todavía no está
+        await using (var conexion = new MySqlConnection(CadenaTest))
+        {
+            await conexion.OpenAsync();
+            await Ejecutar(conexion, $"ALTER TABLE {tabla} DROP COLUMN {columna};");
+        }
+
+        var problema = await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
+
+        problema.Should().BeNull();
+        (await ExisteColumna(tabla, columna)).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Correrlo dos veces no puede fallar: se ejecuta en CADA arranque. Es el
+    /// caso que rompió la primera versión de esto —un ALTER a ciegas daba
+    /// "Duplicate column name" en la segunda apertura— y también el que
+    /// destapó que las variables de usuario de MySQL (<c>SET @x :=</c>) no
+    /// funcionan sin <c>Allow User Variables=true</c> en la cadena.
+    /// </summary>
+    [Fact]
+    public async Task ActualizarEsquemaAsync_CorrerloDosVeces_NoFalla()
+    {
+        var verificador = new VerificadorBaseDatos(CadenaTest);
+
+        (await verificador.ActualizarEsquemaAsync()).Should().BeNull();
+        (await verificador.ActualizarEsquemaAsync()).Should().BeNull(
+            "la app lo corre en cada arranque");
+    }
+
+    /// <summary>
+    /// El permiso nuevo no alcanza con dárselo al rol: los usuarios YA creados
+    /// tienen sus permisos copiados en usuario_permiso por el trigger del alta.
+    /// Sin esta parte, el Admin de la clínica actualizaría y seguiría sin poder
+    /// rebajar precios.
+    /// </summary>
+    [Fact]
+    public async Task ActualizarEsquemaAsync_LeDaElPermisoNuevoAlAdminQueYaExistia()
+    {
+        await using (var conexion = new MySqlConnection(CadenaTest))
+        {
+            await conexion.OpenAsync();
+            // Se simula la instalación vieja: sin el permiso en ninguna tabla
+            await Ejecutar(conexion, """
+                DELETE up FROM usuario_permiso up JOIN permiso p ON p.id = up.permiso_id
+                 WHERE p.codigo = 'precio_editar';
+                """);
+            await Ejecutar(conexion, """
+                DELETE rp FROM rol_permiso rp JOIN permiso p ON p.id = rp.permiso_id
+                 WHERE p.codigo = 'precio_editar';
+                """);
+            await Ejecutar(conexion, "DELETE FROM permiso WHERE codigo = 'precio_editar';");
+            await Ejecutar(conexion, """
+                INSERT INTO usuario (username, password_hash, nombre, rol_id)
+                VALUES ('admin_viejo', 'hash', 'Admin Viejo',
+                        (SELECT id FROM rol WHERE nombre = 'Admin'));
+                """);
+        }
+
+        var problema = await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
+
+        problema.Should().BeNull();
+        (await TienePermisoEfectivo("admin_viejo", "precio_editar")).Should().BeTrue();
+    }
+
+    private async Task<bool> ExisteColumna(string tabla, string columna)
+    {
+        await using var conexion = new MySqlConnection(CadenaTest);
+        await conexion.OpenAsync();
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = @tabla AND column_name = @columna;
+            """;
+        cmd.Parameters.AddWithValue("@tabla", tabla);
+        cmd.Parameters.AddWithValue("@columna", columna);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+    }
+
+    private async Task<bool> TienePermisoEfectivo(string username, string codigo)
+    {
+        await using var conexion = new MySqlConnection(CadenaTest);
+        await conexion.OpenAsync();
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM usuario_permiso up
+              JOIN usuario u ON u.id = up.usuario_id
+              JOIN permiso p ON p.id = up.permiso_id
+             WHERE u.username = @usuario AND p.codigo = @codigo;
+            """;
+        cmd.Parameters.AddWithValue("@usuario", username);
+        cmd.Parameters.AddWithValue("@codigo", codigo);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
     }
 
     private async Task<long> ContarFilas()

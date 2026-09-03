@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MED100.Common;
 using MED100.Models;
 using MED100.Services;
@@ -298,4 +298,82 @@ public class AgendaMedicoTests
         AgendaMedico.SiguientesEstados(estado).Should().BeEmpty();
         AgendaMedico.EsEstadoFinal(estado).Should().BeTrue();
     }
+
+    // =========================================================
+    // Deshacer un estado puesto por error (pedido 2026-08-28)
+    // =========================================================
+
+    /// <summary>
+    /// La vuelta atrás existe justamente porque los estados finales no tienen
+    /// salida: sin esto, un clic de más dejaba la cita muerta.
+    /// </summary>
+    [Theory]
+    [InlineData(EstadoCita.Atendida)]
+    [InlineData(EstadoCita.Cancelada)]
+    [InlineData(EstadoCita.NoAsistio)]
+    public void Deshacer_UnEstadoFinalVuelveAProgramada(EstadoCita estado) =>
+        AgendaMedico.EstadoAlDeshacer(estado).Should().Be(EstadoCita.Programada);
+
+    /// <summary>
+    /// Vuelve a Programada y NO a Confirmada: pasar a confirmada afirmaría que
+    /// el paciente reconfirmó, y eso no lo sabe nadie. Es la diferencia entre
+    /// corregir una marca y inventar un hecho.
+    /// </summary>
+    [Fact]
+    public void Deshacer_NuncaDevuelveAConfirmada() =>
+        AgendaMedico.EstadoAlDeshacer(EstadoCita.Atendida)
+            .Should().NotBe(EstadoCita.Confirmada);
+
+    [Theory]
+    [InlineData(EstadoCita.Programada)]
+    [InlineData(EstadoCita.Confirmada)]
+    public void Deshacer_UnaCitaEnCursoNoTieneNadaQueDeshacer(EstadoCita estado) =>
+        AgendaMedico.EstadoAlDeshacer(estado).Should().BeNull();
+
+    // =========================================================
+    // ChoqueDeAgenda: la pregunta que hace falta al reabrir
+    // =========================================================
+
+    /// <summary>
+    /// Reabrir una cita cancelada la vuelve a poner en la agenda. Si mientras
+    /// estuvo cancelada alguien tomó ese lugar, hay que verlo AHORA y no el día
+    /// de la consulta con los dos pacientes sentados en la sala.
+    /// </summary>
+    [Fact]
+    public void Choque_DetectaAlQueSeMetioEnElHuecoLiberado()
+    {
+        var otro = CitaEn(EnMartes(9), duracion: 30, id: 200);
+        AgendaMedico.ChoqueDeAgenda(EnMartes(9, 15), 30, [otro], exceptoCitaId: 100)
+            .Should().Be(otro);
+    }
+
+    [Fact]
+    public void Choque_ConElHuecoLibreDaNull() =>
+        AgendaMedico.ChoqueDeAgenda(EnMartes(11), 30,
+            [CitaEn(EnMartes(9), id: 200)], exceptoCitaId: 100).Should().BeNull();
+
+    /// <summary>
+    /// Una cita cancelada NO ocupa la agenda, así que no puede impedir que otra
+    /// se reabra en su misma hora. Sin esto, cancelar dos veces la misma franja
+    /// la dejaría bloqueada para siempre.
+    /// </summary>
+    [Fact]
+    public void Choque_LasCanceladasNoBloquean() =>
+        AgendaMedico.ChoqueDeAgenda(EnMartes(9), 30,
+            [CitaEn(EnMartes(9), estado: EstadoCita.Cancelada, id: 200)]).Should().BeNull();
+
+    /// <summary>La cita que se está reabriendo no choca consigo misma.</summary>
+    [Fact]
+    public void Choque_LaPropiaCitaNoCuenta() =>
+        AgendaMedico.ChoqueDeAgenda(EnMartes(9), 30,
+            [CitaEn(EnMartes(9), id: 100)], exceptoCitaId: 100).Should().BeNull();
+
+    /// <summary>
+    /// A diferencia de Validar, esto NO exige que la hora sea futura: se usa
+    /// para reabrir citas viejas mal marcadas, que por definición ya pasaron.
+    /// </summary>
+    [Fact]
+    public void Choque_NoLeImportaQueLaHoraYaHayaPasado() =>
+        AgendaMedico.ChoqueDeAgenda(new DateTime(2020, 1, 7, 9, 0, 0), 30, [])
+            .Should().BeNull();
 }

@@ -1,4 +1,4 @@
-<UserControl x:Class="MED100.Views.CitasView"
+﻿<UserControl x:Class="MED100.Views.CitasView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
@@ -193,7 +193,11 @@
               </Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Día" Style="{DynamicResource Input.Label}" />
-                <DatePicker SelectedDate="{Binding DiaForm, Mode=TwoWay}" />
+                <!-- De hoy en adelante (pedido del cliente 2026-08-28). El
+                     calendario de arriba SÍ va hacia atrás: consultar la agenda
+                     de la semana pasada es normal; agendar en ella, no. -->
+                <DatePicker SelectedDate="{Binding DiaForm, Mode=TwoWay}"
+                            DisplayDateStart="{Binding PrimerDiaAgendable}" />
               </StackPanel>
               <StackPanel Grid.Column="2">
                 <TextBlock Text="Duración (min)" Style="{DynamicResource Input.Label}" />
@@ -268,7 +272,9 @@
                          Foreground="{DynamicResource Brush.TextoSecundario}" Margin="0,10,0,0" />
 
               <!-- Cambios de estado: solo los que tienen sentido desde el actual -->
-              <TextBlock Text="Marcar como" Style="{DynamicResource Input.Label}" Margin="0,18,0,6" />
+              <TextBlock Text="Marcar como" Style="{DynamicResource Input.Label}" Margin="0,18,0,6"
+                         Visibility="{Binding PuedeCambiarEstado,
+                                      Converter={StaticResource BoolAVisibilidad}}" />
               <ItemsControl ItemsSource="{Binding EstadosDisponibles}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
@@ -281,11 +287,25 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Text="Esta cita ya terminó: su estado no se cambia más."
+              <!-- Salida de emergencia: la cita quedó en un estado final por un
+                   clic de más y hay que poder volver atrás (pedido del cliente
+                   2026-08-28). Una cita YA COBRADA no ofrece este botón: eso se
+                   corrige anulando la factura. -->
+              <StackPanel Visibility="{Binding PuedeDeshacerEstado,
+                                       Converter={StaticResource BoolAVisibilidad}}">
+                <TextBlock TextWrapping="Wrap" Style="{DynamicResource Texto.Caption}"
+                           Foreground="{DynamicResource Brush.TextoTerciario}"
+                           Text="Esta cita ya terminó. Si la marcaste por error, podés volver atrás." />
+                <Button Content="Deshacer: volver a programada" Margin="0,8,0,0"
+                        HorizontalAlignment="Stretch"
+                        Style="{DynamicResource Boton.Secundario}"
+                        Command="{Binding DeshacerEstadoCommand}" />
+              </StackPanel>
+              <TextBlock Text="Esta cita ya se cobró: su estado no se cambia más."
                          TextWrapping="Wrap" Style="{DynamicResource Texto.Caption}"
                          Foreground="{DynamicResource Brush.TextoTerciario}"
-                         Visibility="{Binding PuedeCambiarEstado,
-                                      Converter={StaticResource InversorBoolVisibilidad}}" />
+                         Visibility="{Binding EstadoFinalBloqueado,
+                                      Converter={StaticResource BoolAVisibilidad}}" />
 
               <!-- Camino corto de la agenda a la caja: lleva el paciente, el
                    médico y el procedimiento ya cargados -->

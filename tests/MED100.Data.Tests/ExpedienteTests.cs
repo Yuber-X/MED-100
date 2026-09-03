@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
@@ -382,6 +382,83 @@ public class ExpedienteTests : IAsyncLifetime
         var resumen = await _expedientes.ObtenerResumenAsync();
 
         resumen.Single(r => r.ClienteId == _otroPacienteId).UltimaVisitaUtc.Should().BeNull();
+    }
+
+    // ---- Fecha retroactiva de consulta (pedido de la clínica 2026-08-27) ----
+    //
+    // "Se le puede poner la fecha retroactiva de consulta de manera que el
+    //  sistema arroje... todos los que tienen 6 meses sin venir a la clínica"
+    //
+    // Sin esto, un paciente cargado al pasar los archivos viejos figura como
+    // "nunca vino" y queda FUERA del aviso — que es justo a quien hay que
+    // llamar. El aviso no serviría hasta dentro de 6 meses de uso del sistema.
+
+    [Fact]
+    public async Task Resumen_LaUltimaVisitaCargadaAManoCuentaComoVisita()
+    {
+        var hace8Meses = FechaNegocio.Hoy.AddMonths(-8);
+        await PonerVisitaPreviaAsync(_otroPacienteId, hace8Meses);
+
+        var resumen = await _expedientes.ObtenerResumenAsync();
+
+        var fila = resumen.Single(r => r.ClienteId == _otroPacienteId);
+        fila.UltimaVisitaUtc.Should().NotBeNull();
+        DateOnly.FromDateTime(fila.UltimaVisitaUtc!.Value).Should().Be(hace8Meses);
+    }
+
+    /// <summary>
+    /// Y con eso el paciente entra en la lista de a quién llamar, que es todo
+    /// el punto del pedido.
+    /// </summary>
+    [Fact]
+    public async Task Resumen_ConLaFechaCargadaElPacienteApareceComoInactivo()
+    {
+        await PonerVisitaPreviaAsync(_otroPacienteId, FechaNegocio.Hoy.AddMonths(-8));
+
+        var resumen = await _expedientes.ObtenerResumenAsync();
+        var fila = resumen.Single(r => r.ClienteId == _otroPacienteId);
+
+        CalculadoraInactividad.DejoDeVenir(fila.UltimaVisitaUtc, DateTime.UtcNow, 6)
+            .Should().BeTrue();
+    }
+
+    /// <summary>
+    /// La cargada a mano es un PISO, no la verdad: si el paciente ya tiene
+    /// actividad real en el sistema y es más reciente, gana la real. Así no hay
+    /// que borrar la vieja cuando el paciente vuelve.
+    /// </summary>
+    [Fact]
+    public async Task Resumen_LaActividadRealMasRecienteLeGanaALaCargadaAMano()
+    {
+        await PonerVisitaPreviaAsync(_pacienteId, FechaNegocio.Hoy.AddMonths(-8));
+
+        var ayer = DateTime.UtcNow.AddDays(-1);
+        var factura =
+            "INSERT INTO factura (numero_factura, cliente_id, usuario_id, fecha_emision, " +
+            "subtotal, itbis_tasa, itbis, total, metodo_pago) VALUES (" +
+            $"'F-VIS-1', {_pacienteId}, {_usuarioId}, '{ayer:yyyy-MM-dd HH:mm:ss}', " +
+            "1000.00, 0.00, 0.00, 1000.00, 'efectivo');";
+
+        await using (var conexion = new MySqlConnection(CadenaTest))
+        {
+            await conexion.OpenAsync();
+            await Ejecutar(conexion, factura);
+        }
+
+        var resumen = await _expedientes.ObtenerResumenAsync();
+        var fila = resumen.Single(r => r.ClienteId == _pacienteId);
+
+        fila.UltimaVisitaUtc!.Value.Date.Should().Be(ayer.Date);
+        CalculadoraInactividad.DejoDeVenir(fila.UltimaVisitaUtc, DateTime.UtcNow, 6)
+            .Should().BeFalse("vino ayer: no es un paciente perdido");
+    }
+
+    private async Task PonerVisitaPreviaAsync(long clienteId, DateOnly fecha)
+    {
+        await using var conexion = new MySqlConnection(CadenaTest);
+        await conexion.OpenAsync();
+        await Ejecutar(conexion,
+            $"UPDATE cliente SET ultima_visita_previa = '{fecha:yyyy-MM-dd}' WHERE id = {clienteId};");
     }
 
     [Fact]

@@ -1,7 +1,8 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MED100.Common;
 using MED100.Models;
 
 namespace MED100.Printing;
@@ -40,13 +41,18 @@ public static class TicketVisualFactory
 
         // --- Datos de la venta (código de compra = número de factura) ---
         var fechaLocal = TimeZoneInfo.ConvertTimeFromUtc(venta.FechaEmisionUtc, ZonaRd());
-        panel.Children.Add(Fila("Factura:", venta.NumeroFactura, FontWeights.Bold));
+        panel.Children.Add(Fila("Factura no.:", venta.NumeroFactura, FontWeights.Bold));
+        // Qué clase de comprobante es. Se DEDUCE del NCF y no se escribe fijo:
+        // "Factura de consumo" es B02, pero si un día emiten un crédito fiscal
+        // (B01) el papel tiene que decirlo o le sirve de nada al contador del
+        // paciente. Sin NCF no es un comprobante fiscal y no se afirma nada.
+        panel.Children.Add(Texto(ComprobanteFiscal.Tipo(venta.Ncf), 11, FontWeights.Normal,
+            TextAlignment.Center, margen));
         // El NCF va arriba y en negrita: es lo que el paciente le lleva al
         // contador, y buscarlo perdido entre las líneas es un fastidio.
         if (!string.IsNullOrWhiteSpace(venta.Ncf))
             panel.Children.Add(Fila("NCF:", venta.Ncf, FontWeights.Bold));
         panel.Children.Add(Fila("Fecha:", fechaLocal.ToString("dd/MM/yyyy hh:mm tt", CulturaDo), FontWeights.Normal));
-        panel.Children.Add(Fila("Atendió:", nombreCajero, FontWeights.Normal));
         panel.Children.Add(Fila("Paciente:", venta.NombreCliente ?? "Consumidor final", FontWeights.Normal));
         // El médico va en el ticket para que sepa a quién le toca el paciente
         // (pedido 2026-08-10). El PORCENTAJE del honorario NO se imprime: es
@@ -67,7 +73,19 @@ public static class TicketVisualFactory
         panel.Children.Add(Separador());
 
         // --- Totales ---
-        panel.Children.Add(Fila("Subtotal:", Moneda(venta.Totales.Subtotal, negocio), FontWeights.Normal));
+        // Con rebaja se imprimen los tres renglones: lo que valía, lo que se
+        // rebajó y lo que queda. Poner solo el final deja al paciente sin ver
+        // el descuento que le hicieron, que es justo lo que se quiere mostrar.
+        if (venta.Totales.HuboRebaja)
+        {
+            panel.Children.Add(Fila("Subtotal:", Moneda(venta.Totales.SubtotalSinRebaja, negocio), FontWeights.Normal));
+            panel.Children.Add(Fila("Descuento:", "-" + Moneda(venta.Totales.Descuento, negocio), FontWeights.Normal));
+            panel.Children.Add(Fila("Subtotal con descuento:", Moneda(venta.Totales.Subtotal, negocio), FontWeights.Normal));
+        }
+        else
+        {
+            panel.Children.Add(Fila("Subtotal:", Moneda(venta.Totales.Subtotal, negocio), FontWeights.Normal));
+        }
         // Solo se imprime el ITBIS si de verdad hubo: en una clínica casi todo
         // es servicio de salud exento y una línea de "ITBIS 0.00" confunde.
         if (venta.Totales.Itbis > 0m)
@@ -94,10 +112,14 @@ public static class TicketVisualFactory
             if (venta.Cambio is { } cambio)
                 panel.Children.Add(Fila("Cambio:", Moneda(cambio, negocio), FontWeights.Normal));
         }
-        panel.Children.Add(Fila("Pago:", NombreMetodo(venta.MetodoPago), FontWeights.Normal));
+        panel.Children.Add(Fila("Método de pago:", NombreMetodo(venta.MetodoPago), FontWeights.Normal));
+        // El cajero va al final, junto al método de pago, como lo pidió la
+        // clínica el 2026-08-27: es dato de quién cobró, no de quién atendió.
+        panel.Children.Add(Fila("Cajero:", nombreCajero, FontWeights.Normal));
 
         panel.Children.Add(Separador());
-        panel.Children.Add(Texto(string.IsNullOrWhiteSpace(pie) ? "Gracias por su compra" : pie,
+        panel.Children.Add(Texto(
+            string.IsNullOrWhiteSpace(pie) ? "Gracias por preferir nuestros servicios" : pie,
             11, FontWeights.Normal, TextAlignment.Center, new Thickness(12, 4, 12, 16)));
 
         // Medir/organizar para poder imprimir sin mostrarse en pantalla

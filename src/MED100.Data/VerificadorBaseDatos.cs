@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using MySqlConnector;
 
 namespace MED100.Data;
@@ -102,16 +102,110 @@ public class VerificadorBaseDatos
     }
 
     /// <summary>
-    /// Pone al día una base que ya existía. Hoy solo crea la tabla
-    /// <c>licencia</c> (migración 008): sin ella, una instalación que venía de
-    /// una versión anterior no arrancaría, porque la licencia se consulta antes
-    /// del login.
+    /// Un parche de apertura. <see cref="SoloSiFaltaColumna"/> lo saltea cuando
+    /// la columna ya está: es la forma de que un ALTER sea idempotente sin
+    /// <c>ADD COLUMN IF NOT EXISTS</c>, que MySQL 8 no tiene.
     ///
-    /// No es un migrador de verdad —no hay tabla de versiones ni orden de
-    /// scripts—: es el mínimo para que actualizar la app no obligue a nadie a
-    /// abrir MySQL Workbench. Las migraciones 005, 006 y 007 siguen siendo
-    /// manuales; si algún día son tres o cuatro más, esto pide un migrador
-    /// como el de FAControl.
+    /// La pregunta se hace desde C# y NO con <c>SET @existe := ...</c> en SQL:
+    /// las variables de usuario necesitan <c>Allow User Variables=true</c> en
+    /// la cadena de conexión, y la de la app no lo trae. Los scripts sueltos de
+    /// <c>scripts/db/</c> sí las usan porque corren por Workbench, donde el
+    /// driver no se mete.
+    /// </summary>
+    private sealed record Parche(string Motivo, string Sql)
+    {
+        public (string Tabla, string Columna)? SoloSiFaltaColumna { get; init; }
+    }
+
+    /// <summary>
+    /// Los parches que se aplican al abrir sobre una base que ya existía.
+    ///
+    /// Cada uno tiene que ser IDEMPOTENTE: la app los corre en cada arranque y
+    /// el segundo no puede fallar. MySQL 8 no tiene <c>ADD COLUMN IF NOT
+    /// EXISTS</c>, así que las altas de columna preguntan primero a
+    /// information_schema.
+    ///
+    /// No es un migrador de verdad —no hay tabla de versiones ni orden—: es el
+    /// mínimo para que actualizar la app no obligue a nadie a abrir Workbench.
+    /// Las migraciones 005, 006 y 007 siguen siendo manuales. Cuando esta lista
+    /// pase de media docena, conviene traer el migrador de FAControl.
+    /// </summary>
+    private static readonly Parche[] ParchesDeApertura =
+    [
+        // 008 — sin la tabla licencia la app no arranca: se consulta ANTES del login.
+        new("crear la tabla licencia", """
+            CREATE TABLE IF NOT EXISTS licencia (
+              id                  TINYINT UNSIGNED NOT NULL,
+              instalada_at_utc    DATETIME     NOT NULL,
+              activada            TINYINT(1)   NOT NULL DEFAULT 0,
+              activada_at_utc     DATETIME     NULL,
+              activada_por        VARCHAR(80)  NULL,
+              ultima_apertura_utc DATETIME     NOT NULL,
+              PRIMARY KEY (id),
+              CONSTRAINT ck_licencia_fila_unica CHECK (id = 1)
+            ) ENGINE=InnoDB;
+            """),
+
+        // 009 — la ficha del paciente lee esta columna; sin ella, revienta.
+        new("agregar cliente.ultima_visita_previa",
+            "ALTER TABLE cliente ADD COLUMN ultima_visita_previa DATE NULL AFTER referidor_id;")
+            { SoloSiFaltaColumna = ("cliente", "ultima_visita_previa") },
+
+        // 010 — el ticket lee precio_catalogo para poder mostrar la rebaja.
+        new("agregar detalle.precio_catalogo",
+            "ALTER TABLE detalle ADD COLUMN precio_catalogo DECIMAL(15,2) NULL AFTER precio_unitario;")
+            { SoloSiFaltaColumna = ("detalle", "precio_catalogo") },
+
+        // 010 — el permiso de rebajar precios, para Admin y Supervisor. Los
+        // usuarios ya creados tienen sus permisos COPIADOS en usuario_permiso
+        // por el trigger del alta, así que darlo solo al rol no los alcanza.
+        //
+        // No se filtra por `activo`: un usuario dado de baja no puede entrar de
+        // todos modos, y dejarlo fuera haría que le faltara el permiso el día
+        // que lo reactiven — un bug que aparecería meses después.
+        new("dar de alta el permiso precio_editar", """
+            INSERT INTO permiso (codigo, nombre, descripcion)
+            SELECT 'precio_editar', 'Rebajar precios al cobrar',
+                   'Cambiar el precio de una línea en la pantalla de cobro'
+            WHERE NOT EXISTS (SELECT 1 FROM permiso WHERE codigo = 'precio_editar');
+
+            INSERT INTO rol_permiso (rol_id, permiso_id)
+            SELECT r.id, p.id FROM rol r
+              JOIN permiso p ON p.codigo = 'precio_editar'
+             WHERE r.nombre IN ('Admin', 'Supervisor')
+               AND NOT EXISTS (SELECT 1 FROM rol_permiso rp
+                                WHERE rp.rol_id = r.id AND rp.permiso_id = p.id);
+
+            INSERT INTO usuario_permiso (usuario_id, permiso_id)
+            SELECT u.id, p.id FROM usuario u
+              JOIN rol_permiso rp ON rp.rol_id = u.rol_id
+              JOIN permiso p ON p.id = rp.permiso_id AND p.codigo = 'precio_editar'
+             WHERE NOT EXISTS (SELECT 1 FROM usuario_permiso up
+                                WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
+            """),
+    ];
+
+    /// <summary>
+    /// Si la columna ya existe. Consulta parametrizada: el nombre de la tabla
+    /// nunca se concatena, aunque hoy venga de una constante del código.
+    /// </summary>
+    private static async Task<bool> ExisteColumnaAsync(MySqlConnection conexion,
+        string tabla, string columna, CancellationToken ct)
+    {
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE()
+               AND table_name   = @tabla
+               AND column_name  = @columna;
+            """;
+        cmd.Parameters.AddWithValue("@tabla", tabla);
+        cmd.Parameters.AddWithValue("@columna", columna);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync(ct)) > 0;
+    }
+
+    /// <summary>
+    /// Pone al día una base que ya existía aplicando <see cref="ParchesDeApertura"/>.
     /// </summary>
     /// <returns>null si quedó al día; el motivo si algo no se pudo aplicar.</returns>
     public async Task<string?> ActualizarEsquemaAsync(CancellationToken ct = default)
@@ -121,20 +215,29 @@ public class VerificadorBaseDatos
             await using var conexion = new MySqlConnection(_cadenaConexion);
             await conexion.OpenAsync(ct);
 
-            await using var cmd = conexion.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS licencia (
-                  id                  TINYINT UNSIGNED NOT NULL,
-                  instalada_at_utc    DATETIME     NOT NULL,
-                  activada            TINYINT(1)   NOT NULL DEFAULT 0,
-                  activada_at_utc     DATETIME     NULL,
-                  activada_por        VARCHAR(80)  NULL,
-                  ultima_apertura_utc DATETIME     NOT NULL,
-                  PRIMARY KEY (id),
-                  CONSTRAINT ck_licencia_fila_unica CHECK (id = 1)
-                ) ENGINE=InnoDB;
-                """;
-            await cmd.ExecuteNonQueryAsync(ct);
+            foreach (var parche in ParchesDeApertura)
+            {
+                if (parche.SoloSiFaltaColumna is { } destino &&
+                    await ExisteColumnaAsync(conexion, destino.Tabla, destino.Columna, ct))
+                {
+                    continue;
+                }
+
+                await using var cmd = conexion.CreateCommand();
+                cmd.CommandText = parche.Sql;
+                cmd.CommandTimeout = 120;
+                try
+                {
+                    await cmd.ExecuteNonQueryAsync(ct);
+                }
+                catch (MySqlException ex)
+                {
+                    // Se nombra CUÁL falló: "Unknown column" a secas, sobre una
+                    // lista de parches, no dice nada útil a las 8 de la mañana.
+                    return $"No se pudo {parche.Motivo}: {ex.Message}";
+                }
+            }
+
             return null;
         }
         catch (MySqlException ex)

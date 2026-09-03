@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 using MED100.Common;
 using MED100.Models;
 
@@ -18,7 +18,7 @@ public class ClienteRepository
     private const string SelectBase = $"""
         SELECT c.id, c.cedula, c.nombre, c.telefono, c.email, c.fecha_nacimiento,
                c.sexo, c.direccion, c.referidor_id, r.nombre AS referidor_nombre,
-               c.notas, c.created_at, c.updated_at
+               c.ultima_visita_previa, c.notas, c.created_at, c.updated_at
         FROM {DbNames.Cliente} c
         LEFT JOIN {DbNames.Referidor} r ON r.id = c.referidor_id
         """;
@@ -73,10 +73,10 @@ public class ClienteRepository
         cmd.CommandText = $"""
             INSERT INTO {DbNames.Cliente}
               (cedula, nombre, telefono, email, fecha_nacimiento, sexo,
-               direccion, referidor_id, notas)
+               direccion, referidor_id, ultima_visita_previa, notas)
             VALUES
               (@cedula, @nombre, @telefono, @email, @nacimiento, @sexo,
-               @direccion, @referidor, @notas);
+               @direccion, @referidor, @visitaPrevia, @notas);
             SELECT LAST_INSERT_ID();
             """;
         AgregarParametros(cmd, datos);
@@ -91,7 +91,8 @@ public class ClienteRepository
             UPDATE {DbNames.Cliente}
             SET cedula = @cedula, nombre = @nombre, telefono = @telefono,
                 email = @email, fecha_nacimiento = @nacimiento, sexo = @sexo,
-                direccion = @direccion, referidor_id = @referidor, notas = @notas,
+                direccion = @direccion, referidor_id = @referidor,
+                ultima_visita_previa = @visitaPrevia, notas = @notas,
                 updated_at = UTC_TIMESTAMP()
             WHERE id = @id AND deleted_at IS NULL;
             """;
@@ -126,6 +127,9 @@ public class ClienteRepository
             datos.Sexo is { } s ? EnumMap.ADb(s) : (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@direccion", (object?)datos.Direccion ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@referidor", (object?)datos.ReferidorId ?? DBNull.Value);
+        // Igual que la fecha de nacimiento: DATE puro, sin hora ni zona.
+        cmd.Parameters.AddWithValue("@visitaPrevia",
+            datos.UltimaVisitaPrevia is { } v ? v.ToDateTime(TimeOnly.MinValue) : (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@notas", (object?)datos.Notas ?? DBNull.Value);
     }
 
@@ -145,6 +149,8 @@ public class ClienteRepository
             ? null : reader.GetInt64("referidor_id"),
         ReferidorNombre = reader.IsDBNull(reader.GetOrdinal("referidor_nombre"))
             ? null : reader.GetString("referidor_nombre"),
+        UltimaVisitaPrevia = reader.IsDBNull(reader.GetOrdinal("ultima_visita_previa"))
+            ? null : DateOnly.FromDateTime(reader.GetDateTime("ultima_visita_previa")),
         Notas = reader.IsDBNull(reader.GetOrdinal("notas")) ? null : reader.GetString("notas"),
         CreatedAtUtc = DateTime.SpecifyKind(reader.GetDateTime("created_at"), DateTimeKind.Utc),
         UpdatedAtUtc = reader.IsDBNull(reader.GetOrdinal("updated_at"))

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
@@ -93,6 +93,41 @@ public class PacientesTests : IAsyncLifetime
         leido.Sexo.Should().Be(SexoPaciente.Femenino);
         leido.ReferidorId.Should().BeNull();
         leido.ReferidorNombre.Should().BeNull();
+    }
+
+    /// <summary>
+    /// La fecha retroactiva de consulta (pedido de la clínica 2026-08-27) tiene
+    /// que sobrevivir la ida y vuelta a la base como DATE puro: si se colara la
+    /// conversión UTC del resto del sistema, la fecha se correría un día y en
+    /// la frontera de los 6 meses eso mueve a un paciente dentro o fuera de la
+    /// lista de a quién llamar.
+    /// </summary>
+    [Fact]
+    public async Task Crear_GuardaLaUltimaVisitaAnteriorAlSistema()
+    {
+        var id = await _pacientes.CrearAsync(new ClienteDatos(
+            null, "Paciente Migrado", null, null, null,
+            UltimaVisitaPrevia: new DateOnly(2025, 11, 4)));
+
+        var leido = await _pacientes.ObtenerPorIdAsync(id);
+
+        leido!.UltimaVisitaPrevia.Should().Be(new DateOnly(2025, 11, 4));
+    }
+
+    [Fact]
+    public async Task Actualizar_PuedeBorrarLaUltimaVisitaAnteriorAlSistema()
+    {
+        var id = await _pacientes.CrearAsync(new ClienteDatos(
+            null, "Paciente Migrado", null, null, null,
+            UltimaVisitaPrevia: new DateOnly(2025, 11, 4)));
+
+        // Si se cargó por error, dejar el campo vacío tiene que limpiarlo. Sin
+        // esto quedaría pegada para siempre y el paciente figuraría como que
+        // vino cuando nunca vino.
+        await _pacientes.ActualizarAsync(id, new ClienteDatos(
+            null, "Paciente Migrado", null, null, null));
+
+        (await _pacientes.ObtenerPorIdAsync(id))!.UltimaVisitaPrevia.Should().BeNull();
     }
 
     [Fact]

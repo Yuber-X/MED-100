@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
@@ -350,6 +350,127 @@ public class CitasTests : IAsyncLifetime
         var accion = async () => await _citas.CrearAsync(Cita(9, 0, 30));
 
         await accion.Should().NotThrowAsync();
+    }
+
+    // =========================================================
+    // Deshacer un estado puesto por error (pedido del cliente 2026-08-28:
+    // "si uno elige algo por error o se arrepiente. No puede cancelar o
+    // darle para atrás")
+    // =========================================================
+
+    [Theory]
+    [InlineData(EstadoCita.Atendida)]
+    [InlineData(EstadoCita.Cancelada)]
+    [InlineData(EstadoCita.NoAsistio)]
+    public async Task Deshacer_DevuelveLaCitaAProgramada(EstadoCita marcadaPorError)
+    {
+        var id = await _citas.CrearAsync(Cita(9));
+        await _citas.CambiarEstadoAsync(id, marcadaPorError);
+
+        await _citas.RevertirEstadoAsync(id);
+
+        (await _citas.ObtenerPorIdAsync(id))!.Estado.Should().Be(EstadoCita.Programada);
+    }
+
+    /// <summary>
+    /// Y después de deshacer se la puede volver a marcar bien: si quedara en un
+    /// estado sin salida, la vuelta atrás no serviría de nada.
+    /// </summary>
+    [Fact]
+    public async Task Deshacer_DejaLaCitaListaParaMarcarlaDeNuevo()
+    {
+        var id = await _citas.CrearAsync(Cita(9));
+        await _citas.CambiarEstadoAsync(id, EstadoCita.NoAsistio);
+
+        await _citas.RevertirEstadoAsync(id);
+        await _citas.CambiarEstadoAsync(id, EstadoCita.Atendida);
+
+        (await _citas.ObtenerPorIdAsync(id))!.Estado.Should().Be(EstadoCita.Atendida);
+    }
+
+    [Fact]
+    public async Task Deshacer_UnaCitaEnCurso_SeNiega()
+    {
+        var id = await _citas.CrearAsync(Cita(9));
+
+        var accion = async () => await _citas.RevertirEstadoAsync(id);
+
+        await accion.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nada que deshacer*");
+    }
+
+    /// <summary>
+    /// LA protección que importa. Cancelar una cita LIBERA su hueco, y en el
+    /// medio otro paciente puede haberlo tomado. Reabrirla a ciegas dejaría dos
+    /// citas encima y el choque se descubriría el día de la consulta, con los
+    /// dos pacientes en la sala.
+    /// </summary>
+    [Fact]
+    public async Task Deshacer_SiOtroPacienteYaTomoElHueco_SeNiega()
+    {
+        var id = await _citas.CrearAsync(Cita(9, 0, 30));
+        await _citas.CambiarEstadoAsync(id, EstadoCita.Cancelada);
+        await _citas.CrearAsync(Cita(9, 0, 30));   // el hueco quedó libre y se ocupó
+
+        var accion = async () => await _citas.RevertirEstadoAsync(id);
+
+        await accion.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*ya lo tomó otro paciente*");
+
+        (await _citas.ObtenerPorIdAsync(id))!.Estado.Should().Be(EstadoCita.Cancelada,
+            "si no se puede reabrir, la cita tiene que quedar como estaba");
+    }
+
+    /// <summary>
+    /// Si nadie tocó el hueco, reabrir tiene que funcionar. Sin este caso, un
+    /// choque mal calculado —por ejemplo, contra la propia cita— bloquearía
+    /// todas las reaperturas y el test de arriba pasaría igual.
+    /// </summary>
+    [Fact]
+    public async Task Deshacer_ConElHuecoIntacto_Funciona()
+    {
+        var id = await _citas.CrearAsync(Cita(9, 0, 30));
+        await _citas.CambiarEstadoAsync(id, EstadoCita.Cancelada);
+
+        var accion = async () => await _citas.RevertirEstadoAsync(id);
+
+        await accion.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Deshacer_SinPermiso_SeNiega()
+    {
+        var id = await _citas.CrearAsync(Cita(9));
+        await _citas.CambiarEstadoAsync(id, EstadoCita.Cancelada);
+
+        SesionActual.Cerrar();
+        SesionActual.Iniciar(_usuarioId, "test", "Usuario Test", "Cajero",
+            ["vender"], DateTime.UtcNow, 1);
+
+        var accion = async () => await _citas.RevertirEstadoAsync(id);
+
+        await accion.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*permiso*");
+    }
+
+    [Fact]
+    public async Task Deshacer_QuedaEnAuditoria()
+    {
+        var id = await _citas.CrearAsync(Cita(9));
+        await _citas.CambiarEstadoAsync(id, EstadoCita.NoAsistio);
+
+        await _citas.RevertirEstadoAsync(id);
+
+        await using var conexion = new MySqlConnection(CadenaTest);
+        await conexion.OpenAsync();
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText =
+            "SELECT COUNT(*) FROM auditoria WHERE entidad = 'cita' AND entidad_id = @id " +
+            "AND descripcion LIKE 'Se deshizo%';";
+        cmd.Parameters.AddWithValue("@id", id);
+
+        Convert.ToInt64(await cmd.ExecuteScalarAsync()).Should().Be(1,
+            "quién reabrió una cita cerrada tiene que quedar registrado");
     }
 
     // =========================================================

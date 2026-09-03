@@ -2,6 +2,151 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.0.0/). Fechas en hora de República Dominicana.
 
+## [No publicado] — Pedidos de la clínica del 2026-08-28
+
+### Added
+- **Deshacer un estado de cita puesto por error.** Pedido del cliente: *"veo que
+  no se le puede dar para atrás, es decir si uno elige algo por error o se
+  arrepiente. No puede cancelar o darle para atrás"*.
+
+  Los estados «Atendida», «Cancelada» y «No asistió» son finales: un clic de más
+  dejaba la cita cerrada para siempre y el panel solo decía *"su estado no se
+  cambia más"*. Ahora hay un botón **«Deshacer: volver a programada»** que la
+  devuelve al punto neutro, desde donde se la puede marcar bien.
+
+  Vuelve a **Programada** y no al estado anterior a propósito: pasar a
+  «Confirmada» afirmaría que el paciente reconfirmó, y eso no lo sabe nadie.
+
+  Dos protecciones, y las dos importan:
+  - **Una cita ya cobrada no se reabre.** Es la misma regla que ya regían
+    `ActualizarAsync` y `EliminarAsync`: si hay factura de por medio, se corrige
+    anulando la factura.
+  - **Se revalida el hueco.** Cancelar una cita LIBERA su lugar en la agenda, y
+    en el medio otro paciente puede haberlo tomado. Reabrirla a ciegas dejaría
+    dos citas encima y el choque aparecería recién el día de la consulta, con
+    los dos pacientes en la sala. Si el hueco está ocupado, la reapertura se
+    niega diciendo con quién choca.
+
+  Queda en auditoría quién reabrió qué.
+
+- **Confirmación antes de cerrar una cita.** Los botones de «Marcar como»
+  aplicaban de un clic. Ahora preguntan, pero **solo** para los estados que
+  terminan la cita: confirmar «Confirmada» sería ruido, porque desde ahí todavía
+  se puede seguir.
+
+- **«Cancelar cobro» en la pantalla de cobro.** Se podía quitar línea por línea,
+  pero no soltar el cobro entero — y menos el paciente y el médico que arrastra
+  una cita traída desde la agenda. El botón aparece solo si hay algo que
+  abandonar, y avisa que la cita NO se pierde: queda en la agenda para cobrarla
+  después. No borra nada de la base; a esa altura todavía no hay factura.
+
+### Changed
+- **Las citas se agendan de hoy en adelante.** Pedido del cliente: *"limitar las
+  citas a las fechas que aún no han pasado"*.
+
+  La regla ya existía en `AgendaMedico.Validar` —una cita en el pasado nunca se
+  llegó a guardar—, pero el formulario dejaba entrar a un día viejo y lo único
+  que se veía era *"ese día no le quedan huecos libres, probá otro día u otro
+  médico"*: un mensaje que le echa la culpa al médico en vez de decir que la
+  fecha ya pasó. Ahora el calendario del formulario arranca en hoy, «Nueva cita»
+  no hereda un día viejo aunque se esté mirando la agenda de la semana pasada, y
+  si igual se llega con una fecha pasada el mensaje lo dice.
+
+  **El calendario de arriba sigue yendo hacia atrás**: consultar la agenda de la
+  semana pasada es normal; agendar en ella, no.
+
+- **La pantalla «Vender» se llama «Cobrar».** Pedido del cliente: *"al botón
+  vender vamos a llamarle Cobrar"*. Cambia el rótulo del sidebar, el título y
+  los textos de Configuración que la mencionaban. El enum `Pagina.Vender` y el
+  permiso `vender` quedan como están: son identificadores, y renombrarlos
+  obligaría a migrar la tabla de permisos por un cambio de palabra.
+
+## [No publicado] — Pedidos de la clínica del 2026-08-27
+
+### Added
+- **Rebajar el precio de una línea al cobrar.** Pedido del cliente: *"luego que
+  pongo un procedimiento, debe permitir eliminar dicho procedimiento y hacer una
+  modificación al precio o una rebajas"*. Eliminar ya se podía («Quitar»); lo
+  que faltaba era la rebaja.
+
+  Se hizo como **precio editable por línea** y no como un descuento global, y esa
+  es la decisión de fondo: un descuento al final obliga a decidir dos cosas que
+  nadie decidió —si va antes o después del ITBIS, y cómo se reparte entre lo
+  exento y lo gravado—. Con el precio en la línea no hay nada que repartir: el
+  ITBIS sale de lo que se cobra y el honorario del médico también. Hay tests de
+  las dos cosas.
+
+  La columna `detalle.precio_catalogo` guarda el precio de lista al facturar,
+  para que la rebaja quede documentada y la reimpresión salga igual al papel
+  original. Se congela por la misma razón que `exento_itbis`: subir el tarifario
+  mañana no puede agrandar el descuento de una factura ya entregada.
+
+  **Va detrás de un permiso nuevo, `precio_editar`**, otorgado a Admin y
+  Supervisor. Cobrar y decidir cuánto se cobra son dos responsabilidades
+  distintas, y quién da la rebaja debería ser una decisión del dueño y no un
+  efecto secundario de estar en caja. Si la clínica quiere que el Cajero también
+  pueda, se marca desde Admin de Usuarios sin tocar SQL. **Es un default
+  conservador, no una regla del cliente: confirmar.**
+
+- **Fecha retroactiva de consulta.** Pedido del cliente: *"Se le puede poner la
+  fecha retroactiva de consulta de manera que el sistema arroje a partir de que
+  se cargue todas las data de pacientes atendiendo anteriormente todos los que
+  tienen 6 meses sin venir a la clínica"*.
+
+  El aviso de pacientes inactivos deduce la última visita de la actividad
+  registrada (última cita atendida o última factura). Un paciente cargado al
+  pasar los archivos viejos no tiene ninguna de las dos, así que figuraba como
+  "nunca vino" y quedaba fuera del aviso — que es exactamente a quien hay que
+  llamar. Sin esto, el aviso construido el 25 no servía hasta dentro de 6 meses
+  de uso.
+
+  Se agrega el campo **«Última visita (antes del sistema)»** a la ficha del
+  paciente (`cliente.ultima_visita_previa`). Es un **piso**, no la verdad: entra
+  como una candidata más y si hay actividad real posterior, gana la real sin que
+  haya que borrar nada. Cuando la que manda es la cargada a mano, la ficha lo
+  dice: una consulta migrada no vale lo mismo que una cita atendida.
+
+- **Agendar cita desde la ficha del paciente.** Pedido del cliente: *"Debe
+  hacerse desde CITA y Desde Paciente"*. Desde Citas ya se podía; ahora también
+  desde la ficha, que es donde está parada la recepción cuando el paciente pide
+  turno. Lleva a la agenda con el paciente ya elegido.
+
+### Changed
+- **Formato de la factura**, con el encabezado y el orden que mandó el cliente.
+  Lo que cambió respecto de lo que había: una línea de **tipo de comprobante**
+  («Factura de consumo») que se **deduce del prefijo del NCF** según la
+  nomenclatura de la DGII en vez de escribirse fija —si un día emiten un crédito
+  fiscal y el papel sigue diciendo "de consumo", al contador del paciente no le
+  sirve—; **Descuento** cuando hubo rebaja, con los tres renglones (lo que
+  valía, lo que se rebajó, lo que queda); y el cajero movido al final junto al
+  método de pago. El pie pasa a **«Gracias por preferir nuestros servicios»**.
+
+  Los datos del negocio (nombre, RNC, dirección, teléfono) ya salían de
+  Configuración y no del código: **hay que cargarlos ahí** con los de Odonto
+  Unión SRL.
+
+- **La vista previa del ticket pasa a estar encendida por defecto.** Pedido del
+  cliente: *"Cuando le doy a cobrar, debería mostrar la factura es decir como va
+  a salir, y yo poder decidir si imprimir o no imprimir"*. La pantalla existía
+  desde siempre, pero el ajuste arrancaba en OFF —imprimir directo, decisión de
+  Yuber del 2026-07-12 pensada para un mostrador rápido—, así que el cliente
+  nunca la vio. **OJO: el cambio de default solo alcanza a instalaciones nuevas.
+  En la clínica hay que tildarlo en Configuración → Impresión y ticket.**
+
+### Fixed
+- **El paciente elegido se perdía al recargarse la agenda.** `FiltrarPacientes`
+  vaciaba la colección del combo y con ella se iba el `SelectedItem`; con el
+  formulario abierto, Guardar volvía a pedir el paciente sin explicar por qué.
+  Apareció al construir el atajo desde la ficha, pero ya estaba.
+
+### Internal
+- `ActualizarEsquemaAsync` pasa de ser dos parches apilados a una **lista de
+  parches idempotentes** con el motivo de cada uno, y el error dice cuál falló:
+  "Unknown column" a secas, sobre una lista, no dice nada a las 8 de la mañana.
+  Migraciones nuevas: **009** (`cliente.ultima_visita_previa`) y **010**
+  (`detalle.precio_catalogo` + permiso `precio_editar`), las dos con rollback y
+  las dos aplicadas solas al abrir la app.
+
 ## [No publicado] — Pedidos de la clínica del 2026-08-25
 
 ### Added

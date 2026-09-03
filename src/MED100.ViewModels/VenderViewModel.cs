@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -23,14 +23,18 @@ public record ResultadoCobro(
         : $"Insumo · quedan {Stock}";
 }
 
-/// <summary>Línea del carrito en pantalla. La cantidad se ajusta con +/−.</summary>
+/// <summary>
+/// Línea del carrito en pantalla. La cantidad se ajusta con +/− y el precio se
+/// puede rebajar si el usuario tiene el permiso <c>precio_editar</c>.
+/// </summary>
 public partial class CarritoLinea : ObservableObject
 {
     /// <summary>Uno de los dos va con valor, nunca los dos ni ninguno.</summary>
     public long? ProductoId { get; init; }
     public long? ProcedimientoId { get; init; }
     public required string Nombre { get; init; }
-    public required decimal Precio { get; init; }
+    /// <summary>El precio del tarifario. No cambia: es contra el que se compara la rebaja.</summary>
+    public required decimal PrecioCatalogo { get; init; }
     /// <summary>Solo tiene sentido en insumos. Un procedimiento no sale de un estante.</summary>
     public required int StockDisponible { get; init; }
     public required bool Exento { get; init; }
@@ -39,9 +43,29 @@ public partial class CarritoLinea : ObservableObject
     [NotifyPropertyChangedFor(nameof(Subtotal))]
     private int _cantidad = 1;
 
+    /// <summary>
+    /// Lo que se va a cobrar por unidad. Arranca en el precio del tarifario.
+    ///
+    /// Pedido de la clínica (2026-08-27): <i>"debe permitir eliminar dicho
+    /// procedimiento y hacer una modificación al precio o una rebajas"</i>.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Subtotal))]
+    [NotifyPropertyChangedFor(nameof(Rebajado))]
+    [NotifyPropertyChangedFor(nameof(DescuentoTexto))]
+    private decimal _precio;
+
     public decimal Subtotal => Cantidad * Precio;
     public bool EsProcedimiento => ProcedimientoId is not null;
     public string TipoTexto => EsProcedimiento ? "Procedimiento" : "Insumo";
+
+    /// <summary>Se le tocó el precio hacia abajo. Se marca en pantalla.</summary>
+    public bool Rebajado => Precio < PrecioCatalogo;
+
+    /// <summary>Lo que se le rebajó a esta línea, para mostrar debajo del precio.</summary>
+    public string DescuentoTexto => Rebajado
+        ? $"antes {PrecioCatalogo.ToString("N2", CultureInfo.GetCultureInfo("es-DO"))}"
+        : string.Empty;
 }
 
 /// <summary>
@@ -118,6 +142,9 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
     [ObservableProperty] private bool _mostrarCliente = true;
     [ObservableProperty] private bool _mostrarArs = true;
     [ObservableProperty] private decimal _subtotal;
+    /// <summary>Lo rebajado en total. Se muestra y se imprime, no se resta: ya
+    /// está adentro de los precios de las líneas.</summary>
+    [ObservableProperty] private decimal _descuento;
     [ObservableProperty] private decimal _itbis;
     [ObservableProperty] private decimal _total;
     [ObservableProperty] private decimal _pacientePaga;
@@ -138,7 +165,23 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
     /// <summary>El médico es obligatorio si hay procedimientos en el carrito.</summary>
     public bool MedicoObligatorio => Carrito.Any(l => l.EsProcedimiento);
 
+    /// <summary>
+    /// Quién puede rebajar un precio. Va aparte de «vender» a propósito: cobrar
+    /// y decidir cuánto se cobra son dos responsabilidades distintas. Sin el
+    /// permiso, la columna de precio queda de solo lectura.
+    /// </summary>
+    public bool PuedeEditarPrecio => SesionActual.TienePermiso("precio_editar");
+
+    /// <summary>Hay algo rebajado: aparece la línea de descuento en el resumen.</summary>
+    public bool HayDescuento => Descuento > 0m;
+
     public bool HayCitaEnCobro => _citaId is not null;
+
+    /// <summary>
+    /// Hay un cobro empezado que se puede abandonar. Sin esto el botón de
+    /// cancelar aparecería siempre encendido sobre una pantalla vacía.
+    /// </summary>
+    public bool HayCobroEmpezado => Carrito.Count > 0 || _citaId is not null;
 
     partial void OnTextoBusquedaChanged(string value) => Buscar();
     partial void OnEfectivoTextoChanged(string value) => ActualizarCambio();
@@ -165,6 +208,8 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
     {
         try
         {
+            OnPropertyChanged(nameof(PuedeEditarPrecio));   // cambia con quién entró
+
             var cfg = _config.Actual;
             MostrarCliente = cfg.MostrarClienteEnVenta;
             MostrarArs = cfg.ArsActivo;
@@ -306,15 +351,25 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         }
         else
         {
-            Carrito.Add(new CarritoLinea
+            var linea = new CarritoLinea
             {
                 ProductoId = fila.EsProcedimiento ? null : fila.Id,
                 ProcedimientoId = fila.EsProcedimiento ? fila.Id : null,
                 Nombre = fila.Nombre,
-                Precio = fila.Precio,
+                PrecioCatalogo = fila.Precio,
+                Precio = fila.Precio,      // arranca en el de lista
                 StockDisponible = fila.Stock,
                 Exento = fila.Exento
-            });
+            };
+            // Cambiar el precio a mano tiene que recalcular los totales en el
+            // acto: si el TOTAL no sigue al precio, la cajera cobra el número
+            // viejo y la diferencia aparece en el cuadre del día.
+            linea.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(CarritoLinea.Precio))
+                    Recalcular();
+            };
+            Carrito.Add(linea);
         }
         Recalcular();
     }
@@ -360,13 +415,16 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         Subtotal = totales.Subtotal;
         Itbis = totales.Itbis;
         Total = totales.Total;
+        Descuento = totales.Descuento;
 
         var reparto = CalculosClinica.CalcularReparto(totales.Total,
             ArsSeleccionada?.Valor, null, null, LeerCubierto());
         PacientePaga = reparto.PacientePaga;
 
         OnPropertyChanged(nameof(HayItbis));
+        OnPropertyChanged(nameof(HayDescuento));
         OnPropertyChanged(nameof(MedicoObligatorio));
+        OnPropertyChanged(nameof(HayCobroEmpezado));
         ActualizarCambio();
     }
 
@@ -394,7 +452,35 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
 
     private List<VentaLinea> LineasActuales() =>
         [.. Carrito.Select(l => new VentaLinea(
-            l.ProductoId, l.Nombre, l.Cantidad, l.Precio, l.Exento, l.ProcedimientoId))];
+            l.ProductoId, l.Nombre, l.Cantidad, l.Precio, l.Exento, l.ProcedimientoId,
+            l.PrecioCatalogo))];
+
+    /// <summary>
+    /// Abandona el cobro a medio armar y deja la pantalla como recién abierta.
+    ///
+    /// Pedido del cliente (2026-08-28): <i>"si uno elige algo por error o se
+    /// arrepiente. No puede cancelar o darle para atrás"</i>. Se podía quitar
+    /// línea por línea, pero no soltar el cobro entero — y menos el paciente y
+    /// el médico que arrastra una cita traída desde la agenda.
+    ///
+    /// No borra nada de la base: acá todavía no hay factura.
+    /// </summary>
+    [RelayCommand]
+    private void CancelarCobro()
+    {
+        if (!HayCobroEmpezado)
+            return;
+
+        var detalle = HayCitaEnCobro
+            ? "Se descarta lo cargado y se suelta la cita. La cita NO se pierde: " +
+              "queda en la agenda para cobrarla después."
+            : "Se descarta todo lo que hay cargado.";
+
+        if (!_dialogos.Confirmar("Cancelar cobro", "¿Empezar de cero?\n\n" + detalle))
+            return;
+
+        LimpiarParaElSiguiente();
+    }
 
     [RelayCommand]
     private async Task CobrarAsync()
@@ -472,6 +558,7 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         ClienteSeleccionado = Clientes.FirstOrDefault();
         ArsSeleccionada = Aseguradoras.FirstOrDefault();
         OnPropertyChanged(nameof(HayCitaEnCobro));
+        OnPropertyChanged(nameof(HayCobroEmpezado));
         Recalcular();
     }
 }

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
@@ -74,8 +74,11 @@ public class FacturacionClinicaTests : IAsyncLifetime
             _arsId = Convert.ToInt64(await cmdArs.ExecuteScalarAsync());
         }
 
+        // `precio_editar` va en la lista porque el fixture es un Admin, y en el
+        // seed el Admin los tiene todos. Los dos tests de la rebaja sin permiso
+        // vuelven a entrar como Cajero a propósito.
         SesionActual.Iniciar(_usuarioId, "test", "Recepción", "Admin",
-            ["vender", "configuracion", "facturas_anular"], DateTime.UtcNow, 1);
+            ["vender", "configuracion", "facturas_anular", "precio_editar"], DateTime.UtcNow, 1);
 
         // ITBIS encendido: es la única forma de comprobar que los
         // procedimientos NO lo pagan y los insumos SÍ.
@@ -427,6 +430,152 @@ public class FacturacionClinicaTests : IAsyncLifetime
         copia.Ars!.PacientePaga.Should().Be(original.Ars!.PacientePaga);
         copia.Lineas.Should().HaveCount(2);
         copia.Lineas.Count(l => l.EsProcedimiento).Should().Be(1);
+    }
+
+    // =========================================================
+    // Rebaja de precio (pedido de la clínica 2026-08-27)
+    // =========================================================
+
+    private VentaLinea ConsultaRebajada(decimal cobrado, decimal lista = 1500m) =>
+        new(null, "Consulta general", 1, cobrado, Exento: true,
+            ProcedimientoId: _procedimientoId, PrecioCatalogo: lista);
+
+    private VentaLinea GasaRebajada(decimal cobrado, decimal lista = 100m, int cantidad = 1) =>
+        new(_insumoId, "Gasa estéril", cantidad, cobrado, Exento: false,
+            ProcedimientoId: null, PrecioCatalogo: lista);
+
+    [Fact]
+    public async Task Rebaja_SeCobraElPrecioRebajado()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+
+        r.Totales.Total.Should().Be(1200m);
+        r.Totales.Descuento.Should().Be(300m);
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+        leida!.Totales.Total.Should().Be(1200m, "la factura guarda lo que se cobró");
+    }
+
+    /// <summary>
+    /// La rebaja tiene que SOBREVIVIR a la reimpresión. Sin `precio_catalogo`
+    /// en el detalle, una consulta rebajada a 1,200 sería indistinguible de una
+    /// que siempre valió 1,200, y la copia del comprobante saldría sin la línea
+    /// de descuento que tenía el papel original.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_LaReimpresionSigueMostrandoElDescuento()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+        var copia = FacturaService.AVentaResultado(leida!);
+
+        copia.Totales.Descuento.Should().Be(300m);
+        copia.Totales.SubtotalSinRebaja.Should().Be(1500m);
+        copia.Totales.HuboRebaja.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Y el precio de lista queda CONGELADO: subir el tarifario mañana no puede
+    /// convertir una rebaja de 300 en una de 800 en un comprobante ya entregado.
+    /// Es la misma regla que ya protegía al nombre y a la exención.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_SubirElTarifarioNoAgrandaElDescuentoDeUnaFacturaVieja()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+
+        await using (var conexion = new MySqlConnection(CadenaTest))
+        {
+            await conexion.OpenAsync();
+            await Ejecutar(conexion,
+                $"UPDATE procedimiento SET precio = 2000.00 WHERE id = {_procedimientoId};");
+        }
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+        FacturaService.AVentaResultado(leida!).Totales.Descuento.Should().Be(300m);
+    }
+
+    [Fact]
+    public async Task Rebaja_SinTocarElPrecio_NoSeGuardaNadaEnPrecioCatalogo()
+    {
+        var r = await _ventas.RegistrarVentaAsync(Cobro([Consulta()], _medicoId));
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+
+        leida!.Lineas[0].PrecioCatalogo.Should().BeNull(
+            "escribir el mismo número dos veces en cada línea no documenta nada");
+        FacturaService.AVentaResultado(leida).Totales.HuboRebaja.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// El ITBIS del insumo sale del precio REBAJADO. Cobrarlo sobre el de lista
+    /// le haría pagar al paciente 18% de una plata que nadie le cobró.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_ElItbisPersistidoSaleDelPrecioQueSeCobro()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([GasaRebajada(cobrado: 80m)], null));
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+
+        leida!.Totales.Itbis.Should().Be(14.40m, "18% de 80, no de 100");
+        leida.Totales.Total.Should().Be(94.40m);
+    }
+
+    /// <summary>
+    /// El honorario congelado en la factura también sale de lo rebajado: si
+    /// saliera del de lista, la clínica pagaría porcentaje sobre plata que no
+    /// entró.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_ElHonorarioGuardadoSaleDeLoQueSeCobro()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1000m)], _medicoId));
+
+        var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
+
+        leida!.Honorario!.Monto.Should().Be(400m, "40% de 1,000 y no de 1,500");
+    }
+
+    /// <summary>
+    /// La pantalla ya deja la columna de solo lectura sin el permiso, pero eso
+    /// es comodidad. La regla vive en el servicio, que es por donde pasa TODO
+    /// cobro (CLAUDE.md §8.8).
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_SinElPermiso_SeNiegaElCobro()
+    {
+        SesionActual.Cerrar();
+        SesionActual.Iniciar(_usuarioId, "test", "Recepción", "Cajero",
+            ["vender"], DateTime.UtcNow, 1);
+
+        var accion = async () => await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+
+        await accion.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*permiso para rebajar precios*");
+    }
+
+    /// <summary>
+    /// Y sin el permiso se puede seguir cobrando normal: la validación tiene
+    /// que frenar la rebaja, no el mostrador.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_SinElPermiso_ElCobroAPrecioDeListaSigueSaliendo()
+    {
+        SesionActual.Cerrar();
+        SesionActual.Iniciar(_usuarioId, "test", "Recepción", "Cajero",
+            ["vender"], DateTime.UtcNow, 1);
+
+        var accion = async () => await _ventas.RegistrarVentaAsync(Cobro([Consulta()], _medicoId));
+
+        await accion.Should().NotThrowAsync();
     }
 
     [Fact]

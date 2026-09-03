@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MED100.Common;
@@ -60,6 +60,13 @@ public partial class ClienteFormViewModel : ObservableObject
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private DateTime? _fechaNacimiento;
     [ObservableProperty] private string _direccion = string.Empty;
+    /// <summary>
+    /// Última consulta ANTES de usar MED-100, para los pacientes que se cargan
+    /// pasando los archivos viejos (pedido de la clínica 2026-08-27). Sin esto
+    /// figuran como "nunca vino" y quedan fuera del aviso de los que dejaron de
+    /// venir — que son justamente a los que hay que llamar.
+    /// </summary>
+    [ObservableProperty] private DateTime? _ultimaVisitaPrevia;
     [ObservableProperty] private string _notas = string.Empty;
     [ObservableProperty] private string _mensajeError = string.Empty;
     [ObservableProperty] private bool _ocupado;
@@ -101,12 +108,16 @@ public partial class ClienteFormViewModel : ObservableObject
 
     partial void OnFechaNacimientoChanged(DateTime? value) => OnPropertyChanged(nameof(EdadTexto));
 
+    /// <summary>Último día que el calendario de "última visita" deja elegir: hoy.</summary>
+    public DateTime UltimoDiaVisitable => FechaNegocio.Hoy.ToDateTime(TimeOnly.MinValue);
+
     public async Task PrepararNuevoAsync()
     {
         _clienteId = null;
         Titulo = "Nuevo paciente";
         Cedula = Nombre = Telefono = Email = Direccion = Notas = string.Empty;
         FechaNacimiento = null;
+        UltimaVisitaPrevia = null;
         SexoSeleccionado = OpcionesSexo[0];
         ReferidorNombre = string.Empty;
         TipoReferidorSeleccionado = TiposReferidor.First(t => t.Valor == TipoReferidor.Medico);
@@ -128,6 +139,7 @@ public partial class ClienteFormViewModel : ObservableObject
         FechaNacimiento = cliente.FechaNacimiento?.ToDateTime(TimeOnly.MinValue);
         SexoSeleccionado = OpcionesSexo.FirstOrDefault(o => o.Valor == cliente.Sexo) ?? OpcionesSexo[0];
         Direccion = cliente.Direccion ?? string.Empty;
+        UltimaVisitaPrevia = cliente.UltimaVisitaPrevia?.ToDateTime(TimeOnly.MinValue);
         Notas = cliente.Notas ?? string.Empty;
         MensajeError = string.Empty;
 
@@ -235,6 +247,14 @@ public partial class ClienteFormViewModel : ObservableObject
             Ocupado = true;
             MensajeError = string.Empty;
 
+            // Una "última visita" en el futuro no es un dato retroactivo: es un
+            // dedazo, y dejaría al paciente marcado como activo para siempre.
+            if (UltimaVisitaPrevia is { } visita && DateOnly.FromDateTime(visita) > FechaNegocio.Hoy)
+            {
+                MensajeError = "La última visita no puede ser una fecha futura.";
+                return;
+            }
+
             // El referidor se resuelve ANTES de armar el paciente: si el nombre
             // ya existe se reutiliza y si es nuevo se crea, pero el paciente
             // siempre termina con un id, nunca con texto suelto.
@@ -247,7 +267,8 @@ public partial class ClienteFormViewModel : ObservableObject
                 Email,
                 FechaNacimiento is { } f ? DateOnly.FromDateTime(f) : null,
                 SexoSeleccionado?.Valor,
-                referidorId);
+                referidorId,
+                UltimaVisitaPrevia is { } v ? DateOnly.FromDateTime(v) : null);
 
             long id;
             if (_clienteId is null)

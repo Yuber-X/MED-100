@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using MED100.Common;
 using MED100.Models;
 
@@ -88,16 +88,37 @@ public static class AgendaMedico
                 $"atiende {DescribirTramos(tramosDelDia)}.");
 
         // 2) ¿Se pisa con otra cita suya?
-        var choque = citasDelMedico.FirstOrDefault(c =>
+        if (ChoqueDeAgenda(inicioLocal, duracionMinutos, citasDelMedico, exceptoCitaId) is { } choque)
+            throw new ArgumentException(DescribirChoque(choque));
+    }
+
+    /// <summary>
+    /// La primera cita del médico que se pisa con el rango dado, o null si el
+    /// hueco está libre.
+    ///
+    /// Está separado de <see cref="Validar"/> porque hay un caso que necesita
+    /// SOLO esta pregunta: al deshacer una cita cancelada, el hueco vuelve a
+    /// ocuparse y hay que verificar que nadie lo haya tomado mientras tanto —
+    /// pero no tiene sentido exigirle además que sea futura ni que el médico
+    /// siga atendiendo ese día, porque la cita ya existía con esos datos.
+    /// </summary>
+    public static Cita? ChoqueDeAgenda(
+        DateTime inicioLocal,
+        int duracionMinutos,
+        IEnumerable<Cita> citasDelMedico,
+        long? exceptoCitaId = null)
+    {
+        var fin = inicioLocal.AddMinutes(duracionMinutos);
+        return citasDelMedico.FirstOrDefault(c =>
             c.Id != exceptoCitaId &&
             c.OcupaAgenda &&
             Solapan(inicioLocal, fin, LocalDe(c), FinLocalDe(c)));
-
-        if (choque is not null)
-            throw new ArgumentException(
-                $"El médico ya tiene una cita de {Formatear(LocalDe(choque))} a " +
-                $"{Formatear(FinLocalDe(choque))} con {choque.PacienteNombre}.");
     }
+
+    /// <summary>Mensaje del choque, tal cual se le muestra a la recepcionista.</summary>
+    public static string DescribirChoque(Cita choque) =>
+        $"El médico ya tiene una cita de {Formatear(LocalDe(choque))} a " +
+        $"{Formatear(FinLocalDe(choque))} con {choque.PacienteNombre}.";
 
     /// <summary>
     /// Huecos libres de un médico en un día, para la duración pedida.
@@ -176,6 +197,22 @@ public static class AgendaMedico
 
     public static bool EsEstadoFinal(EstadoCita estado) =>
         estado is EstadoCita.Atendida or EstadoCita.Cancelada or EstadoCita.NoAsistio;
+
+    /// <summary>
+    /// A qué estado vuelve una cita que se marcó mal. Null si no hay nada que
+    /// deshacer (la cita todavía está en curso).
+    ///
+    /// Pedido del cliente (2026-08-28): <i>"veo que no se le puede dar para
+    /// atrás, es decir si uno elige algo por error o se arrepiente"</i>. Un
+    /// clic de más en «No asistió» dejaba la cita muerta para siempre.
+    ///
+    /// Vuelve SIEMPRE a «Programada» y no al estado anterior: pasar a
+    /// «Confirmada» afirmaría que el paciente reconfirmó, y eso no lo sabe
+    /// nadie. Programada es el punto neutro desde el que se puede volver a
+    /// marcar lo que de verdad pasó.
+    /// </summary>
+    public static EstadoCita? EstadoAlDeshacer(EstadoCita actual) =>
+        EsEstadoFinal(actual) ? EstadoCita.Programada : null;
 
     // ---------- Auxiliares ----------
 

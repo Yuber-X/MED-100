@@ -1,4 +1,4 @@
-using MED100.Common;
+﻿using MED100.Common;
 using MED100.Data;
 using MED100.Models;
 
@@ -113,14 +113,18 @@ public class FacturaService
         factura.Resumen.Id,
         factura.Resumen.NumeroFactura,
         factura.Resumen.FechaEmisionUtc,
-        factura.Totales,
+        // El descuento NO se guarda en la cabecera: se reconstruye de las
+        // líneas, que es de donde salió. Así la reimpresión de una factura
+        // rebajada dice lo mismo que el papel original sin agregar una columna
+        // que podría quedar desincronizada con su propio detalle.
+        factura.Totales with { Descuento = factura.Lineas.Sum(DescuentoDe) },
         factura.EfectivoRecibido,
         factura.Cambio,
         // Se conserva si era procedimiento o insumo y si iba exento: la
         // reimpresión tiene que salir idéntica al papel original.
         [.. factura.Lineas.Select(l =>
             new VentaLinea(l.ProductoId, l.NombreProducto, l.Cantidad, l.PrecioUnitario,
-                l.Exento, l.ProcedimientoId))],
+                l.Exento, l.ProcedimientoId, l.PrecioCatalogo))],
         factura.Resumen.NombreCliente,
         factura.Resumen.MetodoPago,
         factura.Honorario,
@@ -129,4 +133,9 @@ public class FacturaService
         // El paciente viaja hasta acá para que la copia en PDF sepa a qué
         // expediente va cuando se archiva una factura vieja a mano.
         factura.Resumen.ClienteId);
+
+    private static decimal DescuentoDe(FacturaLinea linea) =>
+        linea.PrecioCatalogo is { } lista && lista > linea.PrecioUnitario
+            ? (lista - linea.PrecioUnitario) * linea.Cantidad
+            : 0m;
 }

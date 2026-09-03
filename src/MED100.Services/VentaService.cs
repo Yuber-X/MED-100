@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
 using MED100.Models;
@@ -221,6 +221,17 @@ public class VentaService
             throw new ArgumentException("Las cantidades deben ser mayores que cero.");
         if (solicitud.Lineas.Any(l => l.PrecioUnitario < 0m))
             throw new ArgumentException("Hay precios inválidos en el carrito.");
+
+        // Rebajar un precio necesita su propio permiso. La pantalla ya deja la
+        // columna de solo lectura sin él, pero eso es comodidad, no seguridad:
+        // la regla vive acá, que es por donde pasa TODO cobro (CLAUDE.md §8.8).
+        if (solicitud.Lineas.Any(l => l.Descuento > 0m) &&
+            !SesionActual.TienePermiso("precio_editar"))
+        {
+            throw new ArgumentException(
+                "No tienes permiso para rebajar precios. Pedí que se cobre al precio de lista, " +
+                "o que un supervisor autorice la rebaja.");
+        }
 
         // Cada línea es un procedimiento O un insumo, nunca las dos ni ninguna
         // (lo mismo que exige ck_detalle_una_cosa; se atrapa acá para dar un

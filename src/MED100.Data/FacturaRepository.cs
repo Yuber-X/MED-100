@@ -1,4 +1,4 @@
-using MySqlConnector;
+﻿using MySqlConnector;
 using MED100.Common;
 using MED100.Models;
 
@@ -154,7 +154,8 @@ public class FacturaRepository
             // en esa tabla.
             cmd.CommandText = $"""
                 SELECT d.producto_id, d.procedimiento_id, d.descripcion,
-                       d.cantidad, d.precio_unitario, d.subtotal, d.exento_itbis
+                       d.cantidad, d.precio_unitario, d.precio_catalogo,
+                       d.subtotal, d.exento_itbis
                 FROM {DbNames.Detalle} d
                 WHERE d.factura_id = @id
                 ORDER BY d.id;
@@ -172,7 +173,12 @@ public class FacturaRepository
                     reader.GetDecimal("subtotal"),
                     reader.IsDBNull(reader.GetOrdinal("procedimiento_id"))
                         ? null : reader.GetInt64("procedimiento_id"),
-                    reader.GetBoolean("exento_itbis")));
+                    reader.GetBoolean("exento_itbis"),
+                    // NULL = se cobró el precio de lista. Las facturas anteriores
+                    // a la migración 010 lo tienen todas en NULL, y está bien:
+                    // en esa época no se podía rebajar.
+                    reader.IsDBNull(reader.GetOrdinal("precio_catalogo"))
+                        ? null : reader.GetDecimal("precio_catalogo")));
         }
 
         return new FacturaCompleta(resumen, totales, efectivo, cambio, lineas,
@@ -340,9 +346,9 @@ public class FacturaRepository
         cmd.CommandText = $"""
             INSERT INTO {DbNames.Detalle}
                 (factura_id, procedimiento_id, producto_id, descripcion, cantidad,
-                 precio_unitario, exento_itbis, subtotal)
+                 precio_unitario, precio_catalogo, exento_itbis, subtotal)
             VALUES (@facturaId, @procedimientoId, @productoId, @descripcion, @cantidad,
-                    @precio, @exento, @subtotal);
+                    @precio, @precioCatalogo, @exento, @subtotal);
             """;
         cmd.Parameters.AddWithValue("@facturaId", facturaId);
         cmd.Parameters.AddWithValue("@procedimientoId", (object?)linea.ProcedimientoId ?? DBNull.Value);
@@ -353,6 +359,11 @@ public class FacturaRepository
         cmd.Parameters.AddWithValue("@exento", linea.Exento);
         cmd.Parameters.AddWithValue("@cantidad", linea.Cantidad);
         cmd.Parameters.AddWithValue("@precio", linea.PrecioUnitario);
+        // Solo se guarda si de verdad hubo rebaja: escribir el mismo número dos
+        // veces en cada línea de cada factura no documenta nada.
+        cmd.Parameters.AddWithValue("@precioCatalogo",
+            linea.PrecioCatalogo is { } lista && lista != linea.PrecioUnitario
+                ? lista : (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@subtotal", linea.Subtotal);
         await cmd.ExecuteNonQueryAsync(ct);
     }

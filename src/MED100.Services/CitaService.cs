@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using MED100.Common;
 using MED100.Data;
 using MED100.Models;
@@ -122,6 +122,59 @@ public class CitaService
         await _auditoria.RegistrarAsync(AccionAuditoria.Modificar, DbNames.Cita, id,
             $"Cita {AgendaMedico.EtiquetaEstado(cita.Estado).ToLower(CulturaRd)} → " +
             $"{AgendaMedico.EtiquetaEstado(nuevo).ToLower(CulturaRd)}: {Describir(cita)}", ct);
+    }
+
+    /// <summary>
+    /// Deshace un estado final puesto por error y devuelve la cita a
+    /// «Programada».
+    ///
+    /// Pedido del cliente (2026-08-28): <i>"si uno elige algo por error o se
+    /// arrepiente. No puede cancelar o darle para atrás"</i>. Marcar «No
+    /// asistió» de un clic dejaba la cita muerta sin vuelta.
+    ///
+    /// Dos protecciones, y las dos importan:
+    ///  - <b>Si ya se cobró, no se toca.</b> Es la misma regla que en
+    ///    <see cref="ActualizarAsync"/> y <see cref="EliminarAsync"/>: una cita
+    ///    unida a una factura se corrige anulando la factura, no reabriendo la
+    ///    agenda.
+    ///  - <b>Se revalida el hueco.</b> Una cita cancelada LIBERA su lugar, y
+    ///    puede haber otro paciente ahí desde entonces. Reactivarla a ciegas
+    ///    crearía dos citas encima y el choque aparecería recién el día de la
+    ///    consulta, con los dos pacientes en la sala.
+    ///
+    /// No se revalida el horario del médico ni que la fecha sea futura: la cita
+    /// ya existía con esos datos y lo que se corrige es la marca, no la cita.
+    /// </summary>
+    public async Task RevertirEstadoAsync(long id, CancellationToken ct = default)
+    {
+        ValidarPermiso();
+        var cita = await _citas.ObtenerPorIdAsync(id, ct)
+            ?? throw new InvalidOperationException("La cita no existe o fue eliminada.");
+
+        if (AgendaMedico.EstadoAlDeshacer(cita.Estado) is not { } destino)
+            throw new InvalidOperationException(
+                $"Una cita {AgendaMedico.EtiquetaEstado(cita.Estado).ToLower(CulturaRd)} " +
+                "no tiene nada que deshacer.");
+
+        if (cita.FacturaId is not null)
+            throw new InvalidOperationException(
+                "Esa cita ya se cobró y no se puede reabrir.\n\n" +
+                "Si hay que corregirla, primero se anula la factura.");
+
+        var local = FechaNegocio.AUtcLocal(cita.FechaHoraUtc);
+        var delDia = await _citas.ObtenerDelMedicoEnDiaAsync(
+            cita.MedicoId, DateOnly.FromDateTime(local), ct);
+
+        if (AgendaMedico.ChoqueDeAgenda(local, cita.DuracionMinutos, delDia, cita.Id) is { } choque)
+            throw new InvalidOperationException(
+                "No se puede reabrir: ese lugar ya lo tomó otro paciente.\n\n" +
+                AgendaMedico.DescribirChoque(choque) + "\n\n" +
+                "Agendala de nuevo en un hueco libre.");
+
+        await _citas.CambiarEstadoAsync(id, destino, ct);
+        await _auditoria.RegistrarAsync(AccionAuditoria.Modificar, DbNames.Cita, id,
+            $"Se deshizo «{AgendaMedico.EtiquetaEstado(cita.Estado)}»: la cita vuelve a " +
+            $"{AgendaMedico.EtiquetaEstado(destino).ToLower(CulturaRd)}. {Describir(cita)}", ct);
     }
 
     /// <summary>

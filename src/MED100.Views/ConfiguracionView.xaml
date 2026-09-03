@@ -78,7 +78,7 @@
       <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
         <StackPanel>
           <TextBlock Text="Cálculos e impuestos" Style="{DynamicResource Texto.Titulo3}" />
-          <TextBlock Text="Esta es la única llave del ITBIS de todo el sistema (antes había también una casilla por procedimiento, y se quitó). Si lo desactivás, desaparece de la pantalla Vender y del ticket, y las facturas salen sin impuesto."
+          <TextBlock Text="Esta es la única llave del ITBIS de todo el sistema (antes había también una casilla por procedimiento, y se quitó). Si lo desactivás, desaparece de la pantalla Cobrar y del ticket, y las facturas salen sin impuesto."
                      Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,14" />
 
           <!-- La regla de fondo de MED-100 y la diferencia con un POS común:
@@ -117,10 +117,10 @@
       <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
         <StackPanel>
           <TextBlock Text="Ventas y facturación" Style="{DynamicResource Texto.Titulo3}" />
-          <TextBlock Text="Al desactivarlo, la pantalla Vender no pide cliente: las facturas salen como consumidor final."
+          <TextBlock Text="Al desactivarlo, la pantalla Cobrar no pide cliente: las facturas salen como consumidor final."
                      Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16" />
 
-          <CheckBox Content="Mostrar selección de cliente en la pantalla Vender"
+          <CheckBox Content="Mostrar selección de cliente en la pantalla Cobrar"
                     IsChecked="{Binding MostrarClienteEnVenta}"
                     FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
         </StackPanel>

@@ -137,6 +137,73 @@ varias transacciones lo consiguen y todas se traban al insertar. Reproducido con
 10 turnos en paralelo. Ahora es un solo `INSERT … SELECT MAX(numero)+1` con reintento, y la
 unicidad la garantiza `uq_turno_fecha_numero`, no el bloqueo.
 
+## Pedidos de la clinica del 2026-08-28 (screenshot en Claude Active)
+
+- [x] **Deshacer un estado de cita puesto por error.** "si uno elige algo por
+      error o se arrepiente. No puede cancelar o darle para atras". Boton
+      "Deshacer: volver a programada" + confirmacion antes de los estados
+      finales. `RevertirEstadoAsync` revalida el hueco (una cancelada libera su
+      lugar) y se niega si la cita ya se cobro. 11 tests nuevos
+- [x] **Las citas solo de hoy en adelante.** La regla ya estaba en
+      `AgendaMedico.Validar`; lo que faltaba era que el FORMULARIO no dejara
+      llegar hasta ahi con un mensaje que culpaba al medico. El calendario de la
+      agenda (el de arriba) sigue yendo hacia atras a proposito
+- [x] **"Cancelar cobro"** en la pantalla de cobro: se podia quitar linea por
+      linea pero no soltar el cobro entero ni la cita traida de la agenda
+- [x] **"Vender" pasa a "Cobrar"** (pedido del 27). Solo el rotulo: el enum
+      `Pagina.Vender` y el permiso `vender` quedan igual
+
+### Pendiente de probar a mano
+- [ ] Marcar una cita como "No asistio", deshacerla y volver a marcarla bien
+- [ ] Cancelar una cita, darle el hueco a otro paciente, e intentar deshacer la
+      primera: tiene que negarse diciendo con quien choca
+- [ ] Abrir "Nueva cita" parado en la agenda de la semana pasada y ver que el
+      dia arranca en hoy
+- [ ] Cobrar desde una cita, darle "Cancelar cobro", y confirmar que la cita
+      sigue en la agenda sin cobrar
+
+## Pedidos de la clinica del 2026-08-27 (screenshots en Claude Active)
+
+- [x] **Rebajar el precio de una linea al cobrar.** Precio editable por linea, NO
+      descuento global: un descuento al final obliga a decidir si va antes o
+      despues del ITBIS y como se reparte entre exento y gravado, y nadie lo
+      decidio. ITBIS y honorario del medico salen de lo que se COBRA.
+      `detalle.precio_catalogo` congela el precio de lista para documentar la
+      rebaja y que la reimpresion salga igual al papel original. Permiso nuevo
+      `precio_editar` (Admin y Supervisor) — CONFIRMAR si el Cajero tambien
+- [x] **Fecha retroactiva de consulta** (`cliente.ultima_visita_previa`). Es un
+      PISO: si hay actividad real posterior, gana la real. Sin esto, el aviso de
+      inactivos del 25 no servia hasta dentro de 6 meses de uso
+- [x] **Agendar cita desde la ficha del paciente**
+- [x] **Formato de la factura**: tipo de comprobante deducido del prefijo del
+      NCF, linea de descuento, cajero al final, pie "Gracias por preferir
+      nuestros servicios"
+- [x] **Ver la factura antes de imprimir**: la pantalla ya existia; el ajuste
+      estaba en OFF por default y por eso el cliente nunca la vio. Ahora ON
+
+### Pendiente de probar a mano
+- [ ] Rebajar una consulta y ver que el TOTAL, el ITBIS y el ticket la reflejan
+- [ ] Reimprimir esa factura y ver que sigue mostrando el descuento
+- [ ] Entrar como Cajero y ver que la columna de precio NO se puede editar
+- [ ] Cargar la ultima visita de un paciente viejo y ver que aparece en el
+      filtro "Los que dejaron de venir"
+- [ ] Agendar desde la ficha de un paciente y ver que llega ya elegido
+- [ ] Ver la factura antes de imprimir y decidir no imprimirla
+
+### Falta para que esto le sirva al cliente
+- [ ] **Cargar los datos del negocio en Configuracion** (Odonto Union SRL, RNC
+      132149971, Aut. San Isidro KM 7 1/2 plaza Eva Maria Local 14,
+      829-720-0174). El ticket los lee de ahi, no del codigo
+- [ ] **Tildar "Mostrar vista previa" en Configuracion** en la PC de la clinica:
+      el cambio de default solo alcanza a instalaciones nuevas
+
+### Sin hacer, necesita decision
+- [ ] **"Balance pendiente"** en la factura. Hoy no existe: MED-100 cobra el
+      total, o lo reparte con la ARS, pero no deja una factura a medio pagar.
+      Eso es un modulo de cuentas por cobrar (abonos, saldo, quien debe), no una
+      linea del ticket. PREGUNTAR al cliente si de verdad fian, o si lo puso por
+      costumbre del formato
+
 ## Pedidos de la clinica del 2026-08-25 (screenshots en Claude Active)
 
 - [x] "Paciente" -> "Nombre" en turnos (columna, campo, boton y ticket impreso).

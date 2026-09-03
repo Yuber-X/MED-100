@@ -1,4 +1,4 @@
-namespace MED100.Models;
+﻿namespace MED100.Models;
 
 /// <summary>Empleado del negocio (sistema multiusuario con roles).</summary>
 public class Usuario
@@ -67,6 +67,13 @@ public class Cliente
     public long? ReferidorId { get; set; }
     /// <summary>Nombre del referidor, resuelto por JOIN. No se persiste desde acá.</summary>
     public string? ReferidorNombre { get; set; }
+    /// <summary>
+    /// Última consulta ANTES de usar MED-100, cargada a mano al pasar los
+    /// pacientes viejos (pedido de la clínica 2026-08-27). Es un PISO para el
+    /// aviso de "dejó de venir": si el paciente tiene actividad real posterior
+    /// en el sistema, gana la real.
+    /// </summary>
+    public DateOnly? UltimaVisitaPrevia { get; set; }
     public string? Notas { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
@@ -86,7 +93,8 @@ public record ClienteDatos(
     string? Email = null,
     DateOnly? FechaNacimiento = null,
     SexoPaciente? Sexo = null,
-    long? ReferidorId = null);
+    long? ReferidorId = null,
+    DateOnly? UltimaVisitaPrevia = null);
 
 /// <summary>
 /// Origen del paciente ("registro de proveniento"): el médico que lo mandó,
@@ -193,11 +201,29 @@ public class ConfiguracionNegocio
 /// cambiarlo en el catálogo reescribiera facturas viejas.
 /// </summary>
 public record VentaLinea(long? ProductoId, string NombreProducto, int Cantidad,
-    decimal PrecioUnitario, bool Exento = false, long? ProcedimientoId = null)
+    decimal PrecioUnitario, bool Exento = false, long? ProcedimientoId = null,
+    decimal? PrecioCatalogo = null)
 {
+    /// <summary>Lo que se cobra por esta línea: siempre el precio REAL.</summary>
     public decimal Subtotal => Cantidad * PrecioUnitario;
 
     public bool EsProcedimiento => ProcedimientoId is not null;
+
+    /// <summary>
+    /// Cuánto se le rebajó a esta línea respecto del tarifario.
+    ///
+    /// Es un dato DERIVADO, no una cuenta aparte: el descuento es la diferencia
+    /// entre el precio de lista y el que se cobró. Por eso no hay ambigüedad
+    /// sobre si va antes o después del ITBIS —el impuesto se calcula sobre lo
+    /// que se cobró, punto— ni sobre cómo repartirlo entre lo exento y lo
+    /// gravado, que es donde un "descuento global" se complica.
+    ///
+    /// Cero si no se tocó el precio, o si se cobró MÁS que el de lista (un
+    /// recargo no es un descuento negativo).
+    /// </summary>
+    public decimal Descuento => PrecioCatalogo is { } lista && lista > PrecioUnitario
+        ? (lista - PrecioUnitario) * Cantidad
+        : 0m;
 
     /// <summary>Línea de procedimiento: exenta por defecto y sin descuento de stock.</summary>
     public static VentaLinea DeProcedimiento(long procedimientoId, string nombre, int cantidad,
@@ -240,9 +266,18 @@ public record VentaSolicitud(
 /// contador cuando pregunte de dónde salió el impuesto.
 /// </summary>
 public record VentaTotales(decimal Subtotal, decimal ItbisTasa, decimal Itbis, decimal Total,
-    decimal BaseGravada = 0m)
+    decimal BaseGravada = 0m, decimal Descuento = 0m)
 {
     public decimal BaseExenta => Subtotal - BaseGravada;
+
+    /// <summary>
+    /// Lo que habría costado sin rebajas. Se muestra en el ticket junto al
+    /// descuento para que se vea de dónde salió; <see cref="Subtotal"/> sigue
+    /// siendo lo que se cobra y es el que entra en las cuentas.
+    /// </summary>
+    public decimal SubtotalSinRebaja => Subtotal + Descuento;
+
+    public bool HuboRebaja => Descuento > 0m;
 }
 
 /// <summary>
@@ -323,7 +358,7 @@ public record FacturaResumen(
 /// </summary>
 public record FacturaLinea(long? ProductoId, string NombreProducto, int Cantidad,
     decimal PrecioUnitario, decimal Subtotal,
-    long? ProcedimientoId = null, bool Exento = false)
+    long? ProcedimientoId = null, bool Exento = false, decimal? PrecioCatalogo = null)
 {
     public bool EsProcedimiento => ProcedimientoId is not null;
 }
@@ -779,19 +814,41 @@ public record HistorialPaciente(
     public int CitasAtendidas => Citas.Count(c => c.Estado == EstadoCita.Atendida);
     public int CitasPerdidas => Citas.Count(c => c.Estado == EstadoCita.NoAsistio);
 
-    /// <summary>Cuándo vino por última vez: la última cita atendida o la última factura.</summary>
+    /// <summary>
+    /// Cuándo vino por última vez: la última cita atendida, la última factura,
+    /// o la fecha que la recepción cargó a mano al pasar el paciente al sistema
+    /// —lo más reciente de las tres.
+    ///
+    /// La fecha manual entra como una más y no como excepción: si el paciente
+    /// ya tiene actividad real posterior, gana la real sin que haya que
+    /// borrarla. Y si alguien la carga por delante de lo registrado, está
+    /// diciendo "vino y no se anotó", que también es información.
+    /// </summary>
     public DateTime? UltimaVisitaUtc
     {
         get
         {
-            var deCitas = Citas.Where(c => c.Estado == EstadoCita.Atendida)
-                               .Select(c => (DateTime?)c.FechaHoraUtc).Max();
-            var deFacturas = Facturas.Where(f => !f.Anulada)
-                                     .Select(f => (DateTime?)f.FechaEmisionUtc).Max();
-            if (deCitas is null) return deFacturas;
-            if (deFacturas is null) return deCitas;
-            return deCitas > deFacturas ? deCitas : deFacturas;
+            DateTime? mayor = null;
+            foreach (var candidata in Candidatas())
+                if (mayor is null || candidata > mayor)
+                    mayor = candidata;
+            return mayor;
         }
+    }
+
+    private IEnumerable<DateTime> Candidatas()
+    {
+        foreach (var c in Citas.Where(c => c.Estado == EstadoCita.Atendida))
+            yield return c.FechaHoraUtc;
+        foreach (var f in Facturas.Where(f => !f.Anulada))
+            yield return f.FechaEmisionUtc;
+        // La cargada a mano es una fecha de calendario, sin hora: se toma a
+        // medianoche y NO se convierte a UTC. Las cuatro horas de diferencia no
+        // significan nada frente a la pregunta que responde esto —"¿hace más de
+        // 6 meses?"— y meter la conversión obligaría a que Models dependiera de
+        // Common solo para eso.
+        if (Paciente.UltimaVisitaPrevia is { } previa)
+            yield return previa.ToDateTime(TimeOnly.MinValue);
     }
 }
 

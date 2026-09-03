@@ -54,9 +54,23 @@ public class AjustesLocales
     // Los ajustes.json que todavía traigan la clave la ignoran sin romperse.
     public int CopiasTicket { get; set; } = 1;
     public string? TicketEncabezado { get; set; }
-    /// <summary>OFF (default): al cobrar se imprime directo sin preguntar (pedido Yuber 2026-07-12).</summary>
-    public bool MostrarVistaPreviaTicket { get; set; }
-    public string? TicketPie { get; set; } = "Gracias por su compra";
+    /// <summary>
+    /// ON (default): al cobrar se muestra la factura antes de imprimir y se
+    /// decide si sale en papel o no.
+    ///
+    /// Arrancaba en OFF —imprimir directo, pedido de Yuber 2026-07-12, pensado
+    /// para un mostrador rápido—, pero la clínica pidió lo contrario el
+    /// 2026-08-27: <i>"Cuando le doy a cobrar, debería mostrar la factura es
+    /// decir como va a salir, y yo poder decidir si imprimir o no imprimir"</i>.
+    /// En una clínica se cobra de a una persona, no de a una fila, y ver el
+    /// papel antes evita gastar el rollo en una factura mal armada.
+    ///
+    /// OJO: cambiar este valor solo afecta a instalaciones NUEVAS. Donde ya
+    /// exista ajustes.json manda lo que diga el archivo, y se cambia desde
+    /// Configuración → Impresión y ticket.
+    /// </summary>
+    public bool MostrarVistaPreviaTicket { get; set; } = true;
+    public string? TicketPie { get; set; } = "Gracias por preferir nuestros servicios";
 
     // Gestión de sesión (spec §8.3.J)
     public int MinutosInactividadLogout { get; set; } = 30;   // 0 = nunca

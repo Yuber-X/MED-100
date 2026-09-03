@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -113,6 +113,20 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
 
     public string DiaTexto => Dia.ToString("dddd d 'de' MMMM 'de' yyyy", CulturaRd);
 
+    /// <summary>
+    /// El primer día que el calendario del formulario deja elegir: hoy.
+    ///
+    /// Pedido del cliente (2026-08-28): <i>"limitar las citas a las fechas que
+    /// aún no han pasado"</i>. La regla ya estaba en <c>AgendaMedico</c> —una
+    /// cita en el pasado nunca se guardó—, pero el calendario dejaba entrar a
+    /// un día viejo y lo único que se veía era "ese día no le quedan huecos",
+    /// que echa la culpa al médico en vez de decir que la fecha ya pasó.
+    ///
+    /// Es SOLO del formulario. El calendario de arriba tiene que seguir yendo
+    /// hacia atrás: consultar la agenda de la semana pasada es normal.
+    /// </summary>
+    public DateTime PrimerDiaAgendable => FechaNegocio.Hoy.ToDateTime(TimeOnly.MinValue);
+
     public bool HaySeleccion => Seleccionada is not null;
 
     /// <summary>Estados a los que puede pasar la cita elegida (vacío si ya terminó).</summary>
@@ -120,6 +134,19 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
 
     /// <summary>False cuando la cita ya está en un estado final: no hay a dónde pasarla.</summary>
     public bool PuedeCambiarEstado => EstadosDisponibles.Count > 0;
+
+    /// <summary>
+    /// La cita quedó en un estado final y se puede volver atrás. Una ya cobrada
+    /// no: eso se corrige anulando la factura. El servicio vuelve a revisarlo,
+    /// pero acá se usa para no ofrecer un botón que va a fallar.
+    /// </summary>
+    public bool PuedeDeshacerEstado =>
+        Seleccionada is { } fila &&
+        AgendaMedico.EstadoAlDeshacer(fila.Estado) is not null &&
+        !fila.YaSeCobro;
+
+    /// <summary>Texto del estado final cuando NO hay nada que ofrecer ni deshacer.</summary>
+    public bool EstadoFinalBloqueado => !PuedeCambiarEstado && !PuedeDeshacerEstado;
 
     partial void OnDiaChanged(DateTime value)
     {
@@ -139,6 +166,8 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
                 EstadosDisponibles.Add(new OpcionEstado(estado, AgendaMedico.EtiquetaEstado(estado)));
         }
         OnPropertyChanged(nameof(PuedeCambiarEstado));
+        OnPropertyChanged(nameof(PuedeDeshacerEstado));
+        OnPropertyChanged(nameof(EstadoFinalBloqueado));
     }
 
     // ---------- Formulario ----------
@@ -258,6 +287,11 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
     private void FiltrarPacientes()
     {
         var filtro = BusquedaPaciente.Trim();
+        // Al vaciar la colección, el ComboBox pierde su SelectedItem. Si esto
+        // corre con el formulario abierto —lo hace: RefrescarAsync recarga el
+        // catálogo de pacientes— el paciente elegido desaparecía sin aviso y
+        // Guardar pedía elegirlo de nuevo. Se guarda el id y se vuelve a poner.
+        var elegido = PacienteSeleccionado?.Id;
         PacientesSugeridos.Clear();
 
         // Con el combo vacío se listan los pacientes ya registrados (pedido de
@@ -273,6 +307,9 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
 
         foreach (var p in visibles.Take(TopePacientes))
             PacientesSugeridos.Add(p);
+
+        if (elegido is { } id)
+            PacienteSeleccionado = PacientesSugeridos.FirstOrDefault(p => p.Id == id);
 
         MensajePacientes = _todosLosPacientes.Count == 0
             ? "Todavía no hay pacientes registrados."
@@ -329,10 +366,21 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
         DuracionTexto = sugerida.ToString(CulturaRd);
     }
 
+    /// <summary>El día del formulario ya pasó: no hay nada que agendar ahí.</summary>
+    private bool DiaFormEsPasado => DateOnly.FromDateTime(DiaForm) < FechaNegocio.Hoy;
+
     private async Task RecalcularHuecosAsync()
     {
         Huecos.Clear();
         MensajeHuecos = string.Empty;
+
+        // Antes de preguntarle nada a la base: si el día ya pasó, el problema
+        // no es el médico ni la duración.
+        if (DiaFormEsPasado)
+        {
+            MensajeHuecos = "Esa fecha ya pasó. Las citas se agendan de hoy en adelante.";
+            return;
+        }
 
         if (MedicoForm?.Id is not { } medicoId)
             return;
@@ -382,7 +430,9 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
             PacienteSeleccionado = null;
             FiltrarPacientes();
             ProcedimientoForm = Procedimientos.FirstOrDefault();
-            DiaForm = Dia;
+            // Si la recepción estaba mirando la agenda de la semana pasada, la
+            // cita nueva NO arranca ahí: se agenda de hoy en adelante.
+            DiaForm = DateOnly.FromDateTime(Dia) < FechaNegocio.Hoy ? PrimerDiaAgendable : Dia;
             DuracionTexto = "30";
             Notas = string.Empty;
             MensajeError = string.Empty;
@@ -401,6 +451,35 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
         {
             MedicoForm = coincide;
         }
+    }
+
+    /// <summary>
+    /// Abre el formulario de cita nueva con un paciente ya elegido.
+    ///
+    /// Pedido de la clínica (2026-08-27): <i>"Ya ví dónde es que se agenda la
+    /// cita... Debe hacerse desde CITA y Desde Paciente"</i>. Desde Citas ya se
+    /// podía; esto es la entrada desde la ficha del paciente, que es donde la
+    /// recepción está parada cuando el paciente pide turno.
+    ///
+    /// Se selecciona el paciente por su NOMBRE en la caja de búsqueda y no
+    /// tocando la lista a mano: el combo solo ofrece los primeros
+    /// <see cref="TopePacientes"/>, y con la clínica llena el paciente podría
+    /// no estar entre ellos. Es el mismo camino que usa reprogramar.
+    /// </summary>
+    public async Task PrepararNuevaParaPacienteAsync(long pacienteId)
+    {
+        // No se toca Dia: asignarlo dispara su propio RefrescarAsync y quedarían
+        // dos corriendo sobre las mismas colecciones. NuevaAsync ya se encarga
+        // de que el formulario no arranque en un día viejo.
+        await RefrescarAsync();            // trae catálogos y la lista de pacientes
+        await NuevaCommand.ExecuteAsync(null);
+
+        if (_todosLosPacientes.FirstOrDefault(p => p.Id == pacienteId) is not { } paciente)
+            return;
+
+        BusquedaPaciente = paciente.Nombre;
+        FiltrarPacientes();
+        PacienteSeleccionado = PacientesSugeridos.FirstOrDefault(p => p.Id == pacienteId);
     }
 
     [RelayCommand]
@@ -473,6 +552,11 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
                 MensajeError = "Elegí el médico.";
                 return;
             }
+            if (DiaFormEsPasado)
+            {
+                MensajeError = "Esa fecha ya pasó. Las citas se agendan de hoy en adelante.";
+                return;
+            }
             if (HuecoSeleccionado is null)
             {
                 MensajeError = "Elegí la hora de la lista de huecos disponibles.";
@@ -522,6 +606,18 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
         if (Seleccionada is null || opcion is null)
             return;
 
+        // Se pregunta SOLO por los estados que TERMINAN la cita. Confirmar
+        // "Confirmada" sería ruido —desde ahí todavía se puede seguir—, pero un
+        // clic de más en «No asistió» la cerraba sin vuelta, que es justo lo que
+        // reportó el cliente el 2026-08-28.
+        if (AgendaMedico.EsEstadoFinal(opcion.Valor) &&
+            !_dialogos.Confirmar($"Marcar como {opcion.Etiqueta.ToLower(CulturaRd)}",
+                $"¿Marcar la cita de {Seleccionada.Paciente} de las " +
+                $"{Seleccionada.HoraTexto} como «{opcion.Etiqueta}»?"))
+        {
+            return;
+        }
+
         try
         {
             await _citas.CambiarEstadoAsync(Seleccionada.Id, opcion.Valor);
@@ -535,6 +631,42 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
         {
             Log.Error(ex, "Error cambiando el estado de la cita");
             _dialogos.MostrarError("Citas", $"No se pudo cambiar el estado.\n\n{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Vuelve atrás un estado final puesto por error: la cita regresa a
+    /// «Programada» y desde ahí se la puede marcar bien.
+    ///
+    /// Pedido del cliente (2026-08-28): <i>"si uno elige algo por error o se
+    /// arrepiente. No puede cancelar o darle para atrás"</i>.
+    /// </summary>
+    [RelayCommand]
+    private async Task DeshacerEstadoAsync()
+    {
+        if (Seleccionada is not { } fila)
+            return;
+
+        if (!_dialogos.Confirmar("Deshacer",
+                $"La cita de {fila.Paciente} de las {fila.HoraTexto} está marcada como " +
+                $"«{fila.EstadoTexto}».\n\n¿Volver a dejarla como programada?"))
+        {
+            return;
+        }
+
+        try
+        {
+            await _citas.RevertirEstadoAsync(fila.Id);
+            await RefrescarAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _dialogos.MostrarError("Deshacer", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error deshaciendo el estado de la cita");
+            _dialogos.MostrarError("Citas", $"No se pudo deshacer.\n\n{ex.Message}");
         }
     }
 

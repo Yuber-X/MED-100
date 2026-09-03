@@ -280,6 +280,16 @@ public partial class App : Application
             await clienteForm.PrepararEdicionAsync(id);
             main.MostrarSubpagina(Pagina.Clientes, clienteForm, "Editar paciente");
         });
+        // Ficha → agenda: la cita se pone con el paciente ya elegido, sin
+        // volver a buscarlo (pedido de la clínica 2026-08-27).
+        pacienteFicha.CitaSolicitada += id => _ = AbrirEdicionAsync(async () =>
+        {
+            // Primero se arma el formulario y DESPUÉS se navega: Navegar dispara
+            // su propio RefrescarAsync sin esperarlo, y arrancar el nuestro
+            // encima dejaría dos recorriendo las mismas colecciones.
+            await citas.PrepararNuevaParaPacienteAsync(id);
+            main.VolverA(Pagina.Citas);
+        });
 
         // Almacén de expedientes: lista → expediente de un paciente, y desde
         // ahí un atajo a su ficha completa (citas, facturas, procedimientos).

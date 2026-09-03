@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -93,6 +93,8 @@ public partial class PacienteFichaViewModel : ObservableObject
 
     public event Action? Cerrado;
     public event Action<long>? EdicionSolicitada;
+    /// <summary>El shell lleva a la agenda con este paciente ya elegido.</summary>
+    public event Action<long>? CitaSolicitada;
 
     public PacienteFichaViewModel(ClienteService pacientes, TurnoService turnos,
         IDialogService dialogos)
@@ -131,6 +133,12 @@ public partial class PacienteFichaViewModel : ObservableObject
     [ObservableProperty] private string _totalPagadoTexto = "0.00";
     [ObservableProperty] private string _totalArsTexto = "0.00";
     [ObservableProperty] private string _ultimaVisitaTexto = "Todavía no ha venido";
+    /// <summary>
+    /// De dónde salió la fecha de arriba. Importa: una fecha cargada a mano al
+    /// migrar el paciente no vale lo mismo que una cita atendida, y sin decirlo
+    /// parecería que el sistema la registró.
+    /// </summary>
+    [ObservableProperty] private string _origenUltimaVisitaTexto = string.Empty;
     [ObservableProperty] private string _resumenCitasTexto = string.Empty;
     [ObservableProperty] private bool _mostrarArs;
 
@@ -141,6 +149,9 @@ public partial class PacienteFichaViewModel : ObservableObject
 
     public bool PuedeEditar => SesionActual.TienePermiso("clientes_editar");
 
+    /// <summary>Sin permiso de agenda el botón no aparece: llevaría a un error.</summary>
+    public bool PuedeAgendar => SesionActual.TienePermiso("citas");
+
     public async Task CargarAsync(long clienteId)
     {
         try
@@ -148,6 +159,7 @@ public partial class PacienteFichaViewModel : ObservableObject
             Ocupado = true;
             PacienteId = clienteId;
             OnPropertyChanged(nameof(PuedeEditar));
+            OnPropertyChanged(nameof(PuedeAgendar));
 
             var h = await _pacientes.ObtenerHistorialAsync(clienteId);
             var p = h.Paciente;
@@ -206,6 +218,15 @@ public partial class PacienteFichaViewModel : ObservableObject
                 ? FechaNegocio.AUtcLocal(ultima).ToString("dd/MM/yyyy", CulturaRd)
                 : "Todavía no ha venido";
 
+            // Si la que ganó es la cargada a mano, se dice. Se compara por DÍA
+            // porque la manual no tiene hora y las otras sí.
+            var manual = p.UltimaVisitaPrevia;
+            OrigenUltimaVisitaTexto =
+                manual is { } m && h.UltimaVisitaUtc is { } gano &&
+                DateOnly.FromDateTime(FechaNegocio.AUtcLocal(gano)) == m
+                    ? "Cargada a mano (antes del sistema)"
+                    : string.Empty;
+
             ResumenCitasTexto = h.Citas.Count == 0
                 ? "Sin citas"
                 : $"{h.Citas.Count} cita(s) · {h.CitasAtendidas} atendida(s)" +
@@ -237,6 +258,13 @@ public partial class PacienteFichaViewModel : ObservableObject
 
     [RelayCommand]
     private void Editar() => EdicionSolicitada?.Invoke(PacienteId);
+
+    /// <summary>
+    /// Agendar sin salir a buscar al paciente de nuevo (pedido de la clínica
+    /// 2026-08-27: la cita también se pone "Desde Paciente").
+    /// </summary>
+    [RelayCommand]
+    private void AgendarCita() => CitaSolicitada?.Invoke(PacienteId);
 
     [RelayCommand]
     private Task RecargarAsync() => CargarAsync(PacienteId);

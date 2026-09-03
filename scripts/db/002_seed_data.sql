@@ -1,4 +1,4 @@
--- =============================================================
+﻿-- =============================================================
 -- MED-100 — Seed de roles y permisos base
 -- Script: 002_seed_data.sql (requerido para operar — NO es data de prueba)
 -- Ejecutar después de 001_create_schema.sql.
@@ -49,7 +49,12 @@ INSERT INTO permiso (codigo, nombre, descripcion) VALUES
   ('procedimientos',     'Procedimientos',            'Tarifario de procedimientos'),
   ('citas',              'Citas',                     'Agenda de citas y recordatorios'),
   ('turnos',             'Turnos de sala',            'Dar y llamar turnos de la sala de espera'),
-  ('expedientes',        'Expedientes de pacientes',  'Ver y subir los documentos del paciente. Eliminarlos es solo del Admin.');
+  ('expedientes',        'Expedientes de pacientes',  'Ver y subir los documentos del paciente. Eliminarlos es solo del Admin.'),
+  -- Rebajar el precio de una línea al cobrar (pedido de la clínica 2026-08-27).
+  -- Va aparte de 'vender' a propósito: cobrar y decidir cuánto se cobra son dos
+  -- responsabilidades distintas, y quien da la rebaja tiene que ser una
+  -- decisión del dueño, no un efecto secundario de estar en caja.
+  ('precio_editar',      'Rebajar precios al cobrar', 'Cambiar el precio de una línea en la pantalla de cobro');
 
 -- Admin: todos los permisos
 INSERT INTO rol_permiso (rol_id, permiso_id)
@@ -62,7 +67,7 @@ SELECT r.id, p.id FROM rol r
 JOIN permiso p ON p.codigo IN
   ('panel','vender','clientes','clientes_editar','productos','almacen','caducidad',
    'comprobantes','comprobantes_todos','cuadre','cuadre_todos','reportes','facturas_anular',
-   'medicos','procedimientos','citas','turnos','expedientes')
+   'medicos','procedimientos','citas','turnos','expedientes','precio_editar')
 WHERE r.nombre = 'Supervisor';
 
 -- Cajero: cobra y atiende el mostrador. Hereda el 'clientes_editar' que
