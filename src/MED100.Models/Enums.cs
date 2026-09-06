@@ -111,6 +111,30 @@ public enum SemaforoCaducidad
 }
 
 /// <summary>
+/// Semáforo de un fiado, calculado en tiempo real igual que el de caducidad
+/// (012). Los nombres y los umbrales son los mismos que usa FAControl para las
+/// cuotas, porque Yuber pidió explícitamente que se pareciera a eso: quien mira
+/// las dos pantallas no tiene que aprender dos códigos de color distintos.
+///
+/// Las brochas ya existen en Themes/Colores.xaml (Brush.AlDia.*, Brush.PorVencer.*,
+/// Brush.Vencido.*, Brush.EnMora.*, Brush.Pagado.*) desde que se clonó el
+/// proyecto: venían de PrestControl y hasta ahora ninguna se usaba.
+/// </summary>
+public enum SemaforoFiado
+{
+    /// <summary>Ya no debe nada.</summary>
+    Pagado,
+    /// <summary>Falta más de una semana, o no se fijó fecha.</summary>
+    AlDia,
+    /// <summary>Vence dentro de los próximos 7 días (hoy incluido).</summary>
+    PorVencer,
+    /// <summary>Se pasó de la fecha por 15 días o menos.</summary>
+    Vencido,
+    /// <summary>Se pasó por más de 15 días: hay que llamar.</summary>
+    EnMora
+}
+
+/// <summary>
 /// Qué clase de cosa es un producto del almacén (pedido de Yuber 2026-08-14).
 /// Coincide con ENUM producto.tipo.
 ///

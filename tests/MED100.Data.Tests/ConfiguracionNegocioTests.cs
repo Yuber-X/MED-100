@@ -36,7 +36,8 @@ public class ConfiguracionNegocioTests : IAsyncLifetime
         _config = new ConfiguracionNegocioService(new ConfiguracionNegocioRepository(factory), auditoria);
         _ventas = new VentaService(new FacturaRepository(factory),
             new ClienteRepository(factory), new MedicoRepository(factory),
-            new ArsRepository(factory), _config, auditoria);
+            new ArsRepository(factory), _config, auditoria,
+            new NcfService(new NcfRepository(factory), auditoria));
 
         await using (var conexion = new MySqlConnection(CadenaTest))
         {

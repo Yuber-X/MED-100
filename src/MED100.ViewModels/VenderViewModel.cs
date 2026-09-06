@@ -89,6 +89,9 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
     private readonly MedicoService _medicos;
     private readonly ArsService _ars;
     private readonly ConfiguracionNegocioService _config;
+    // Se llama _ncfService y no _ncf porque _ncf ya es el campo que respalda la
+    // propiedad observable Ncf (el texto que el cajero escribe a mano).
+    private readonly NcfService _ncfService;
     private readonly IDialogService _dialogos;
 
     private IReadOnlyList<Producto> _catalogoInsumos = [];
@@ -102,7 +105,8 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
 
     public VenderViewModel(VentaService ventas, ProductoService productos,
         ProcedimientoService procedimientos, ClienteService clientes, MedicoService medicos,
-        ArsService ars, ConfiguracionNegocioService config, IDialogService dialogos)
+        ArsService ars, ConfiguracionNegocioService config, NcfService ncf,
+        IDialogService dialogos)
     {
         _ventas = ventas;
         _productos = productos;
@@ -111,6 +115,7 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         _medicos = medicos;
         _ars = ars;
         _config = config;
+        _ncfService = ncf;
         _dialogos = dialogos;
 
         MetodosPago =
@@ -137,6 +142,67 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
     [ObservableProperty] private string _arsAutorizacion = string.Empty;
     [ObservableProperty] private string _arsCubiertoTexto = string.Empty;
     [ObservableProperty] private string _ncf = string.Empty;
+
+    /// <summary>
+    /// El próximo comprobante de la secuencia autorizada, para mostrarlo debajo
+    /// de la caja de NCF. Vacío cuando no hay secuencia cargada, está apagada,
+    /// venció o se agotó — en cualquiera de esos casos el NCF se sigue
+    /// escribiendo a mano y anunciar un número sería mentir.
+    /// </summary>
+    [ObservableProperty] private string _proximoNcf = string.Empty;
+
+    public bool HayNcfAutomatico => !string.IsNullOrEmpty(ProximoNcf);
+
+    partial void OnProximoNcfChanged(string value) => OnPropertyChanged(nameof(HayNcfAutomatico));
+
+    // ============================================================
+    // Fiado (012) — "queda debiendo"
+    // ============================================================
+    // Apagado por defecto: el caso normal es que el paciente pague todo, y
+    // arrancar con la deuda abierta invitaría a fiar por descuido.
+
+    [ObservableProperty] private bool _dejaSaldoPendiente;
+    [ObservableProperty] private string _abonadoTexto = string.Empty;
+    [ObservableProperty] private DateTime? _fechaCompromiso;
+
+    /// <summary>La sección ni aparece si el usuario no puede fiar.</summary>
+    public bool PuedeFiar => SesionActual.TienePermiso("fiados");
+
+    /// <summary>Lo que quedaría debiendo con lo escrito ahora mismo.</summary>
+    public string SaldoPendienteTexto
+    {
+        get
+        {
+            if (!DejaSaldoPendiente)
+                return string.Empty;
+            if (!decimal.TryParse(AbonadoTexto, NumberStyles.Number, CulturaDo, out var entrega))
+                entrega = 0m;
+
+            var debe = PacientePaga - entrega;
+            if (debe < 0m)
+                return "Está entregando más de lo que debe.";
+            if (debe == 0m)
+                return "No queda saldo: está pagando todo.";
+            return $"Queda debiendo RD$ {debe.ToString("N2", CulturaDo)}";
+        }
+    }
+
+    partial void OnDejaSaldoPendienteChanged(bool value)
+    {
+        if (value)
+        {
+            // Arranca en blanco y no en el total: el cajero tiene que escribir
+            // lo que de verdad recibió, no confirmar un número que ya estaba.
+            AbonadoTexto = string.Empty;
+            // Quince días es el plazo que la clínica usa de palabra. Es un punto
+            // de partida editable, no una regla.
+            FechaCompromiso ??= DateTime.Today.AddDays(15);
+        }
+        OnPropertyChanged(nameof(SaldoPendienteTexto));
+    }
+
+    partial void OnAbonadoTextoChanged(string value) =>
+        OnPropertyChanged(nameof(SaldoPendienteTexto));
     [ObservableProperty] private Opcion<MetodoPagoFactura> _metodoSeleccionado;
     [ObservableProperty] private string _efectivoTexto = string.Empty;
     [ObservableProperty] private bool _mostrarCliente = true;
@@ -217,6 +283,11 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
 
             _catalogoInsumos = await _productos.ObtenerTodosAsync();
             _catalogoProcedimientos = await _procedimientos.ObtenerActivosAsync();
+
+            // Nunca tira: ProximoNcfAsync devuelve null ante cualquier problema
+            // y el cartel simplemente no aparece. Que falle el marcador no puede
+            // dejar sin abrir la pantalla de cobro.
+            ProximoNcf = await _ncfService.ProximoNcfAsync() ?? string.Empty;
 
             if (MostrarCliente)
             {
@@ -420,6 +491,9 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         var reparto = CalculosClinica.CalcularReparto(totales.Total,
             ArsSeleccionada?.Valor, null, null, LeerCubierto());
         PacientePaga = reparto.PacientePaga;
+        // El saldo del fiado se calcula contra esto: si cambia el carrito o la
+        // cobertura de la ARS, el "queda debiendo" tiene que moverse con él.
+        OnPropertyChanged(nameof(SaldoPendienteTexto));
 
         OnPropertyChanged(nameof(HayItbis));
         OnPropertyChanged(nameof(HayDescuento));
@@ -502,6 +576,29 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
             efectivo = monto;
         }
 
+        // ---- Fiado (012) -----------------------------------------------
+        decimal? abonado = null;
+        DateOnly? compromiso = null;
+        if (DejaSaldoPendiente)
+        {
+            if (!decimal.TryParse(AbonadoTexto, NumberStyles.Number, CulturaDo, out var entrega))
+            {
+                _dialogos.MostrarError("Cobrar",
+                    "Indicá cuánto está entregando el paciente (ej: 500.00). " +
+                    "Si no deja nada, escribí 0.");
+                return;
+            }
+            if (FechaCompromiso is not { } fecha)
+            {
+                _dialogos.MostrarError("Cobrar",
+                    "Indicá para cuándo se compromete a pagar. Sin fecha, la deuda no " +
+                    "aparece en los avisos y se pierde de vista.");
+                return;
+            }
+            abonado = entrega;
+            compromiso = DateOnly.FromDateTime(fecha);
+        }
+
         var solicitud = new VentaSolicitud(LineasActuales(),
             MostrarCliente ? ClienteSeleccionado?.Valor : null,
             MetodoSeleccionado.Valor, efectivo,
@@ -510,7 +607,7 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
             string.IsNullOrWhiteSpace(ArsAutorizacion) ? null : ArsAutorizacion.Trim(),
             MostrarArs ? LeerCubierto() : 0m,
             string.IsNullOrWhiteSpace(Ncf) ? null : Ncf.Trim(),
-            _citaId);
+            _citaId, abonado, compromiso);
 
         try
         {
@@ -543,6 +640,23 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         }
     }
 
+    /// <summary>
+    /// Vuelve a leer el próximo comprobante de la secuencia. Se traga cualquier
+    /// error: el cartel es una ayuda visual y el cobro no depende de él.
+    /// </summary>
+    private async Task RefrescarProximoNcfAsync()
+    {
+        try
+        {
+            ProximoNcf = await _ncfService.ProximoNcfAsync() ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "No se pudo refrescar el próximo NCF");
+            ProximoNcf = string.Empty;
+        }
+    }
+
     private void LimpiarParaElSiguiente()
     {
         Carrito.Clear();
@@ -553,6 +667,15 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         // El NCF NO se arrastra al próximo cobro: es único por comprobante y
         // repetirlo haría fallar la restricción con un error incomprensible.
         Ncf = string.Empty;
+        // El cobro que acaba de salir consumió un número: el cartel tiene que
+        // mostrar el siguiente, no el que ya se fue en el papel anterior.
+        // Sin await a propósito — el cajero ya puede empezar a cargar el próximo
+        // paciente mientras esto vuelve, y si falla el cartel solo desaparece.
+        _ = RefrescarProximoNcfAsync();
+        // El fiado tampoco se arrastra: el próximo paciente paga lo suyo.
+        DejaSaldoPendiente = false;
+        AbonadoTexto = string.Empty;
+        FechaCompromiso = null;
         AvisoCita = string.Empty;
         _citaId = null;
         ClienteSeleccionado = Clientes.FirstOrDefault();

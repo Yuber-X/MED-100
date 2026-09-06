@@ -47,7 +47,8 @@ public class FacturacionClinicaTests : IAsyncLifetime
         await _config.CargarAsync();
 
         _ventas = new VentaService(facturaRepo, new ClienteRepository(_factory),
-            _medicosRepo, new ArsRepository(_factory), _config, auditoria);
+            _medicosRepo, new ArsRepository(_factory), _config, auditoria,
+            new NcfService(new NcfRepository(_factory), auditoria));
         _facturas = new FacturaService(facturaRepo, auditoria);
 
         await using (var conexion = new MySqlConnection(CadenaTest))

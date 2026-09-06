@@ -35,6 +35,13 @@ public class AjustesLocales
     /// <summary>Ids de productos silenciados con "No volver a avisar".</summary>
     public List<long> AvisoProductosSilenciados { get; set; } = [];
 
+    // Fiados (012). Viajan en el MISMO aviso diario que la caducidad: dos
+    // correos por día se dejan de leer, y entonces no sirve ninguno de los dos.
+    /// <summary>Incluir las deudas de pacientes en el aviso diario.</summary>
+    public bool AvisoFiadosActivo { get; set; } = true;
+    /// <summary>Con cuántos días de anticipación se avisa de una deuda por vencer.</summary>
+    public int AvisoFiadosDias { get; set; } = 7;
+
     // Paciente que dejó de venir (pedido del cliente 2026-08-25):
     //   "quiero que de si se puede una especie de alerta cuando un paciente
     //    dure más de 6 meses sin ser atendido"

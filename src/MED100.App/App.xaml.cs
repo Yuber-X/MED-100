@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using MED100.Common;
 using MED100.Data;
 using MED100.Services;
 using MED100.ViewModels;
@@ -21,6 +22,32 @@ public partial class App : Application
     private ServiceProvider _servicios = null!;
 
     /// <summary>
+    /// La señal de "esta aplicación está abierta" que mira el instalador.
+    ///
+    /// El nombre tiene que ser EXACTAMENTE el mismo que AppMutexNombre en
+    /// installer/MED100.iss. Inno Setup no lo abre para bloquear nada: mira si
+    /// existe, y si existe se niega a instalar y le pide al usuario que cierre
+    /// el programa.
+    ///
+    /// Existe por lo que pasó en FAControl el 2026-09-05: se actualizó con la
+    /// aplicación abierta, Windows no pudo reemplazar las DLL en uso y las
+    /// difirió al próximo reinicio, pero el asistente igual dijo que había
+    /// terminado bien. El cliente siguió con la versión vieja creyendo que
+    /// tenía la nueva, y se descubrió días después.
+    ///
+    /// Va con prefijo Global\ para que se vea entre sesiones de Windows: en la
+    /// clínica la recepcionista de la mañana y la de la tarde entran con
+    /// cuentas distintas, y una sesión bloqueada con la app abierta es
+    /// justamente el caso que hay que detectar.
+    ///
+    /// NO se libera nunca a mano: el sistema operativo lo suelta al terminar el
+    /// proceso, incluso si la aplicación se cae. Un mutex que quedara tomado
+    /// tras un cierre sucio haría imposible actualizar hasta reiniciar.
+    /// </summary>
+    private static readonly System.Threading.Mutex InstanciaAbierta =
+        new(initiallyOwned: false, name: @"Global\MediControl.App.Instancia");
+
+    /// <summary>
     /// Red de seguridad: cualquier error que nadie haya atrapado se registra y
     /// se le muestra al usuario, en vez de cerrar la aplicación de golpe.
     ///
@@ -39,7 +66,7 @@ public partial class App : Application
                 "Ocurrió un error inesperado.\n\n" + e.Exception.Message +
                 "\n\nLa aplicación sigue abierta. Si se repite, avisá al soporte: " +
                 MED100.Common.Soporte.Telefono,
-                "MED-100", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppInfo.Nombre, MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;   // no se cierra la app
         };
 
@@ -55,6 +82,11 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Toca el mutex para forzar su creación acá, en el arranque, y no en
+        // algún momento indeterminado más adelante. Es la señal que mira el
+        // instalador para saber que la aplicación está abierta.
+        GC.KeepAlive(InstanciaAbierta);
 
         ConfigurarSerilog();
         ConfigurarRedDeSeguridad();
@@ -181,7 +213,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "Error cambiando de usuario");
-            MessageBox.Show($"No se pudo cambiar de usuario.\n\n{ex.Message}", "MED-100",
+            MessageBox.Show($"No se pudo cambiar de usuario.\n\n{ex.Message}", AppInfo.Nombre,
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -209,6 +241,8 @@ public partial class App : Application
         main.RegistrarPagina(Pagina.Productos, productos);
         main.RegistrarPagina(Pagina.Almacen, _servicios.GetRequiredService<AlmacenViewModel>());
         main.RegistrarPagina(Pagina.Caducidad, _servicios.GetRequiredService<CaducidadViewModel>());
+        main.RegistrarPagina(Pagina.Fiados, _servicios.GetRequiredService<FiadosViewModel>());
+        main.RegistrarPagina(Pagina.Indicaciones, _servicios.GetRequiredService<IndicacionesViewModel>());
         main.RegistrarPagina(Pagina.Panel, _servicios.GetRequiredService<PanelViewModel>());
         main.RegistrarPagina(Pagina.Reportes, _servicios.GetRequiredService<ReportesViewModel>());
         main.RegistrarPagina(Pagina.Cuadre, _servicios.GetRequiredService<CuadreViewModel>());
@@ -380,7 +414,7 @@ public partial class App : Application
             Log.Error(ex, "Error generando el ticket {Numero}", factura.NumeroFactura);
             MessageBox.Show(
                 $"La factura {factura.NumeroFactura} está registrada, pero no se pudo " +
-                $"generar el ticket.\n\n{ex.Message}", "MED-100",
+                $"generar el ticket.\n\n{ex.Message}", AppInfo.Nombre,
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -424,7 +458,7 @@ public partial class App : Application
             MessageBox.Show(
                 $"El turno {etiqueta} quedó guardado, pero no se pudo imprimir.\n\n{ex.Message}\n\n" +
                 "Podés reimprimirlo desde la pantalla de la sala de espera.",
-                "MED-100", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppInfo.Nombre, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -555,7 +589,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "Error generando el cierre de caja");
-            MessageBox.Show($"No se pudo generar el cierre.\n\n{ex.Message}", "MED-100",
+            MessageBox.Show($"No se pudo generar el cierre.\n\n{ex.Message}", AppInfo.Nombre,
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -570,7 +604,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "No se pudo abrir el formulario de edición");
-            MessageBox.Show(ex.Message, "MED-100", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, AppInfo.Nombre, MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -608,7 +642,7 @@ public partial class App : Application
     /// </summary>
     private async Task<bool> PrepararBaseDatosAsync()
     {
-        const string titulo = "MED-100";
+        const string titulo = AppInfo.Nombre;
         try
         {
             var verificador = _servicios.GetRequiredService<VerificadorBaseDatos>();
@@ -622,7 +656,7 @@ public partial class App : Application
                     {
                         Log.Error("No se pudo poner al día la base de datos: {Motivo}", motivo);
                         MessageBox.Show(
-                            "La base de datos quedó de una versión anterior de MED-100 y no se " +
+                            $"La base de datos quedó de una versión anterior de {AppInfo.Nombre} y no se " +
                             "pudo actualizar:\n\n" + motivo + "\n\n" +
                             "Tus datos están intactos. Ejecuta scripts\\db\\008_licencia.sql " +
                             "como root y vuelve a abrir MED-100.",
@@ -633,7 +667,7 @@ public partial class App : Application
 
                 case EstadoBaseDatos.FaltaBaseDatos:
                     var crear = MessageBox.Show(
-                        "La base de datos de MED-100 todavía no existe en este equipo.\n\n" +
+                        $"La base de datos de {AppInfo.Nombre} todavía no existe en este equipo.\n\n" +
                         "¿Quieres crearla ahora? Toma solo unos segundos y no afecta nada más del sistema.",
                         titulo + " — Primer arranque",
                         MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
@@ -729,6 +763,9 @@ public partial class App : Application
         servicios.AddSingleton<ProcedimientoRepository>();
         servicios.AddSingleton<ProductoRepository>();
         servicios.AddSingleton<FacturaRepository>();
+        servicios.AddSingleton<NcfRepository>();
+        servicios.AddSingleton<FiadoRepository>();
+        servicios.AddSingleton<IndicacionRepository>();
         servicios.AddSingleton<ConfiguracionNegocioRepository>();
         servicios.AddSingleton<CuadreRepository>();
         servicios.AddSingleton<AnaliticaRepository>();
@@ -749,6 +786,9 @@ public partial class App : Application
         servicios.AddSingleton<ProcedimientoService>();
         servicios.AddSingleton<ProductoService>();
         servicios.AddSingleton<ConfiguracionNegocioService>();
+        servicios.AddSingleton<NcfService>();
+        servicios.AddSingleton<FiadoService>();
+        servicios.AddSingleton<IndicacionService>();
         servicios.AddSingleton<VentaService>();
         servicios.AddSingleton<FacturaService>();
         servicios.AddSingleton<CuadreService>();
@@ -782,6 +822,8 @@ public partial class App : Application
         servicios.AddSingleton<ProductoFormViewModel>();
         servicios.AddSingleton<AlmacenViewModel>();
         servicios.AddSingleton<CaducidadViewModel>();
+        servicios.AddSingleton<FiadosViewModel>();
+        servicios.AddSingleton<IndicacionesViewModel>();
         servicios.AddSingleton<VenderViewModel>();
         servicios.AddSingleton<ComprobantesViewModel>();
         servicios.AddSingleton<CuadreViewModel>();

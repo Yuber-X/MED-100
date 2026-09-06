@@ -15,6 +15,22 @@
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
+  <!-- Versión del producto. TIENE que coincidir con MED100.Common.AppInfo.Version
+       y con AppVersion en installer/MED100.iss.
+
+       No es cosmético: el actualizador lee la versión del .exe que quedó en
+       disco y la compara con la que traía. Si el ejecutable no llevara versión,
+       esa comprobación no podría hacerse y volveríamos al problema del
+       2026-09-05 en FAControl — el asistente diciendo "listo" mientras la
+       aplicación seguía siendo la vieja. -->
+  <PropertyGroup>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <Product>MediControl</Product>
+    <Company>Yuber Santana</Company>
+  </PropertyGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>

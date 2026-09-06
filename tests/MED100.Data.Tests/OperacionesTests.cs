@@ -70,7 +70,8 @@ public class OperacionesTests : IAsyncLifetime
 
         await config.CargarAsync();
         _ventas = new VentaService(facturaRepo, new ClienteRepository(factory),
-            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria);
+            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria,
+            new NcfService(new NcfRepository(factory), auditoria));
         _facturas = new FacturaService(facturaRepo, auditoria);
         _cuadres = new CuadreService(new CuadreRepository(factory), auditoria);
     }

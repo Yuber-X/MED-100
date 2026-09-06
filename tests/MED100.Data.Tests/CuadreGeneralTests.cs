@@ -66,7 +66,8 @@ public class CuadreGeneralTests : IAsyncLifetime
 
         await config.CargarAsync();
         _ventas = new VentaService(new FacturaRepository(factory), new ClienteRepository(factory),
-            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria);
+            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria,
+            new NcfService(new NcfRepository(factory), auditoria));
         _cuadres = new CuadreService(new CuadreRepository(factory), auditoria);
     }
 

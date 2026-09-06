@@ -72,7 +72,8 @@ public class AnaliticaTests : IAsyncLifetime
 
         await config.CargarAsync();
         _ventas = new VentaService(facturaRepo, new ClienteRepository(factory),
-            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria);
+            new MedicoRepository(factory), new ArsRepository(factory), config, auditoria,
+            new NcfService(new NcfRepository(factory), auditoria));
         _facturas = new FacturaService(facturaRepo, auditoria);
         _analitica = new AnaliticaService(new AnaliticaRepository(factory), new AjustesLocales());
 

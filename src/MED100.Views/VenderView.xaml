@@ -181,12 +181,52 @@
         <TextBlock Text="NCF (opcional)" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
         <TextBox Style="{DynamicResource Input.Texto}"
                  Text="{Binding Ncf, UpdateSourceTrigger=PropertyChanged}"
-                 ToolTip="Comprobante fiscal. Se escribe a mano; no se repite entre facturas." />
+                 ToolTip="Comprobante fiscal. Si lo dejás vacío y hay una secuencia autorizada cargada en Configuración, la app asigna el siguiente sola." />
+        <!-- El próximo de la secuencia, cuando hay una cargada. Es informativo:
+             el número REAL se reserva al cobrar, dentro de la transacción, así
+             que si otro cajero cobra primero este cartel queda viejo por unos
+             segundos. Por eso dice "el siguiente" y no promete cuál. -->
+        <TextBlock Style="{DynamicResource Texto.Caption}"
+                   Foreground="{DynamicResource Brush.TextoTerciario}"
+                   TextWrapping="Wrap" Margin="0,4,0,0"
+                   Visibility="{Binding HayNcfAutomatico, Converter={StaticResource BoolAVisibilidad}}">
+          <Run Text="Vacío = se asigna el siguiente de la secuencia (" /><Run
+               Text="{Binding ProximoNcf, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=")." />
+        </TextBlock>
 
         <TextBlock Text="Método de pago" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />
         <ComboBox Height="40" FontSize="13"
                   ItemsSource="{Binding MetodosPago}"
                   SelectedItem="{Binding MetodoSeleccionado}" />
+
+        <!-- ===== Fiado (012) =====
+             Solo aparece para quien tiene el permiso `fiados`: decidir a quién
+             se le fía es una decisión de crédito, no de mostrador. -->
+        <StackPanel Margin="0,14,0,0"
+                    Visibility="{Binding PuedeFiar, Converter={StaticResource BoolAVisibilidad}}">
+          <CheckBox Content="Queda debiendo (fiado)"
+                    IsChecked="{Binding DejaSaldoPendiente}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <StackPanel Margin="0,10,0,0"
+                      Visibility="{Binding DejaSaldoPendiente, Converter={StaticResource BoolAVisibilidad}}">
+            <TextBlock Text="Entrega ahora" Style="{DynamicResource Input.Label}" />
+            <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                     Text="{Binding AbonadoTexto, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Lo que el paciente deja hoy. Si no deja nada, escribí 0." />
+
+            <TextBlock Text="Se compromete a pagar el" Style="{DynamicResource Input.Label}" Margin="0,10,0,0" />
+            <DatePicker SelectedDate="{Binding FechaCompromiso}" Margin="0,6,0,0"
+                        Height="40" FontSize="13" />
+
+            <!-- El saldo se recalcula mientras se escribe: es el número que el
+                 cajero le dice al paciente en voz alta antes de confirmar. -->
+            <TextBlock Text="{Binding SaldoPendienteTexto}" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Style="{DynamicResource Texto.Caption}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Vencido.Texto}" />
+          </StackPanel>
+        </StackPanel>
 
         <StackPanel Visibility="{Binding PideEfectivo, Converter={StaticResource BoolAVisibilidad}}">
           <TextBlock Text="Efectivo recibido" Style="{DynamicResource Input.Label}" Margin="0,14,0,6" />

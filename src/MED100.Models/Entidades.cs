@@ -255,7 +255,22 @@ public record VentaSolicitud(
     /// <summary>Comprobante fiscal asignado a mano. NULL = sin NCF.</summary>
     string? Ncf = null,
     /// <summary>Cita que se está cobrando, si el cobro salió de la agenda.</summary>
-    long? CitaId = null);
+    long? CitaId = null,
+    /// <summary>
+    /// Lo que el paciente entrega EN EL MOSTRADOR (012). NULL = paga todo, que
+    /// es el caso normal y deja el comportamiento de siempre.
+    ///
+    /// Menor que <c>PacientePaga</c> significa FIADO: la diferencia queda como
+    /// saldo. Nunca puede ser mayor —eso sería un anticipo contra deudas
+    /// futuras, que es otro problema y no se resuelve inventándolo acá.
+    /// </summary>
+    decimal? AbonadoInicial = null,
+    /// <summary>
+    /// Cuándo dijo el paciente que termina de pagar. De acá sale el semáforo y
+    /// el aviso automático, así que es OBLIGATORIA cuando queda saldo: una
+    /// deuda sin fecha no le aparece a nadie nunca (ver VentaService.ValidarFiado).
+    /// </summary>
+    DateOnly? FechaCompromiso = null);
 
 /// <summary>
 /// Totales calculados del cobro.
@@ -316,7 +331,66 @@ public record VentaResultado(
     /// El paciente, o NULL si fue consumidor final. Es lo que decide a qué
     /// expediente va la copia en PDF del comprobante.
     /// </summary>
-    long? ClienteId = null);
+    long? ClienteId = null,
+    /// <summary>Lo que entregó en el mostrador (012). Va impreso en el ticket.</summary>
+    decimal AbonadoInicial = 0m,
+    /// <summary>Fecha acordada de pago del saldo, si quedó debiendo.</summary>
+    DateOnly? FechaCompromiso = null)
+{
+    /// <summary>
+    /// Lo que el paciente quedó debiendo. Derivado, nunca guardado: un saldo
+    /// persistido se desincroniza de sus propios pagos y después nadie sabe
+    /// cuál de los dos miente.
+    /// </summary>
+    public decimal SaldoPendiente =>
+        Math.Max(0m, (Ars?.PacientePaga ?? Totales.Total) - AbonadoInicial);
+
+    public bool QuedoFiado => SaldoPendiente > 0m;
+}
+
+/// <summary>
+/// Un pago posterior a la emisión de la factura (012, tabla factura_abono).
+///
+/// Lleva su propia fecha y su propio método de pago porque entra a la caja del
+/// día en que se cobra, no a la del día en que se facturó. Y lleva usuario_id
+/// porque entra al cuadre de QUIEN lo recibe.
+/// </summary>
+public class FacturaAbono
+{
+    public long Id { get; set; }
+    public long FacturaId { get; set; }
+    public long UsuarioId { get; set; }
+    public DateTime FechaUtc { get; set; }
+    public decimal Monto { get; set; }
+    public MetodoPagoFactura MetodoPago { get; set; }
+    public string? Notas { get; set; }
+    /// <summary>Solo para mostrar: quién lo recibió. No se persiste acá.</summary>
+    public string? UsuarioNombre { get; set; }
+}
+
+/// <summary>
+/// Una fila de la pantalla de fiados: la factura, cuánto falta y desde cuándo.
+///
+/// El saldo viene calculado en SQL (paciente_paga − abonado_inicial − abonos):
+/// sacarlo en C# obligaría a traer todos los abonos de todas las facturas para
+/// mostrar una lista.
+/// </summary>
+public class FiadoResumen
+{
+    public long FacturaId { get; set; }
+    public string NumeroFactura { get; set; } = string.Empty;
+    public DateTime FechaEmisionUtc { get; set; }
+    public long? ClienteId { get; set; }
+    /// <summary>"Consumidor final" cuando la factura salió sin paciente.</summary>
+    public string ClienteNombre { get; set; } = string.Empty;
+    public string? ClienteTelefono { get; set; }
+    /// <summary>Lo que le tocaba pagar al paciente (después de la ARS).</summary>
+    public decimal PacientePaga { get; set; }
+    public decimal Pagado { get; set; }
+    public DateOnly? FechaCompromiso { get; set; }
+
+    public decimal Saldo => Math.Max(0m, PacientePaga - Pagado);
+}
 
 /// <summary>Aseguradora. Catálogo chico, se desactiva en vez de borrarse.</summary>
 public class Ars
@@ -390,7 +464,20 @@ public record CuadreResumen(
     int FacturasAnuladas,
     decimal MontoAnulado,
     int TiempoActivoSegundos,
-    bool YaCerrado)
+    bool YaCerrado,
+    /// <summary>
+    /// Lo que quedó DEBIENDO en las facturas de hoy (012). No entra a la caja:
+    /// se informa aparte para que el cajero entienda por qué facturó más de lo
+    /// que tiene en la mano.
+    /// </summary>
+    decimal TotalFiado = 0m,
+    /// <summary>
+    /// Abonos de deudas VIEJAS cobrados hoy. Sí entran a la caja, y ya vienen
+    /// sumados en los totales por método de pago. Se expone por separado
+    /// porque, al revés del fiado, es plata que hay que tener en la mano y que
+    /// no corresponde a ninguna factura de hoy.
+    /// </summary>
+    decimal TotalAbonosRecibidos = 0m)
 {
     public string TiempoActivoTexto
     {

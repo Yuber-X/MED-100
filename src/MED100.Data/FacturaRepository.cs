@@ -273,6 +273,7 @@ public class FacturaRepository
         VentaTotales totales, MetodoPagoFactura metodoPago,
         decimal? efectivoRecibido, decimal? cambio,
         HonorarioMedico? honorario, RepartoArs? ars, string? ncf,
+        decimal? abonadoInicial = null, DateOnly? fechaCompromiso = null,
         CancellationToken ct = default)
     {
         using var cmd = conexion.CreateCommand();
@@ -283,12 +284,14 @@ public class FacturaRepository
                  subtotal, itbis_tasa, itbis, total,
                  honorario_porcentaje, honorario_monto,
                  ars_id, ars_autorizacion, ars_cubierto, paciente_paga,
+                 abonado_inicial, fecha_compromiso,
                  metodo_pago, efectivo_recibido, cambio, ncf, estado)
             VALUES
                 (@numero, @clienteId, @usuarioId, @medicoId, @fecha,
                  @subtotal, @itbisTasa, @itbis, @total,
                  @honorarioPct, @honorarioMonto,
                  @arsId, @arsAutorizacion, @arsCubierto, @pacientePaga,
+                 @abonado, @fechaCompromiso,
                  @metodoPago, @efectivo, @cambio, @ncf, 'emitida');
             SELECT LAST_INSERT_ID();
             """;
@@ -309,6 +312,12 @@ public class FacturaRepository
         // Sin ARS, el paciente paga todo. Guardarlo igual (en vez de 0) es lo
         // que permite que el cuadre sume SIEMPRE esta columna.
         cmd.Parameters.AddWithValue("@pacientePaga", ars?.PacientePaga ?? totales.Total);
+        // NULL = pagó todo. Es lo que mantiene intacto el comportamiento de las
+        // facturas de siempre: sin fiar, abonado_inicial == paciente_paga y el
+        // cuadre suma exactamente lo mismo que antes de la 012.
+        cmd.Parameters.AddWithValue("@abonado", abonadoInicial ?? ars?.PacientePaga ?? totales.Total);
+        cmd.Parameters.AddWithValue("@fechaCompromiso",
+            (object?)fechaCompromiso?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@metodoPago", EnumMap.ADb(metodoPago));
         cmd.Parameters.AddWithValue("@efectivo", (object?)efectivoRecibido ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@cambio", (object?)cambio ?? DBNull.Value);

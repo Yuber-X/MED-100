@@ -35,18 +35,28 @@ public class CuadreRepository
             SELECT
               COALESCE(SUM(estado = 'emitida'), 0)                                      AS facturas,
               COALESCE(SUM(CASE WHEN estado = 'emitida' THEN total END), 0.00)          AS vendido,
-              -- Lo que ENTRA a la caja es paciente_paga, no total: lo que
-              -- cubre la ARS se cobra por otra via y en otro momento
-              -- (CLAUDE.md 1.3.3). Sin ARS, paciente_paga == total, asi que
-              -- para una clinica sin seguros no cambia nada.
+              -- Lo que ENTRA a la caja es abonado_inicial, no total:
+              --  * lo que cubre la ARS se cobra por otra via y en otro momento
+              --    (CLAUDE.md 1.3.3), por eso nunca fue `total` sino paciente_paga;
+              --  * y desde la 012 el paciente puede quedar debiendo, asi que
+              --    tampoco es paciente_paga sino lo que efectivamente entrego.
+              -- Sin ARS y sin fiar, abonado_inicial == paciente_paga == total,
+              -- asi que para el dia a dia de una clinica no cambia nada.
+              -- Los abonos de deudas viejas se suman aparte (ver mas abajo):
+              -- entran a la caja del dia en que se cobran, no a la del dia en
+              -- que se facturo.
               COALESCE(SUM(CASE WHEN estado = 'emitida' AND metodo_pago = 'efectivo'
-                                THEN paciente_paga END), 0.00)                          AS efectivo,
+                                THEN abonado_inicial END), 0.00)                        AS efectivo,
               COALESCE(SUM(CASE WHEN estado = 'emitida' AND metodo_pago = 'tarjeta'
-                                THEN paciente_paga END), 0.00)                                  AS tarjeta,
+                                THEN abonado_inicial END), 0.00)                                AS tarjeta,
               COALESCE(SUM(CASE WHEN estado = 'emitida' AND metodo_pago = 'transferencia'
-                                THEN paciente_paga END), 0.00)                                  AS transferencia,
+                                THEN abonado_inicial END), 0.00)                                AS transferencia,
               COALESCE(SUM(CASE WHEN estado = 'emitida' AND metodo_pago = 'mixto'
-                                THEN paciente_paga END), 0.00)                                  AS mixto,
+                                THEN abonado_inicial END), 0.00)                                AS mixto,
+              -- Lo que quedo fiado HOY. No entra a la caja: se informa para que
+              -- el cajero entienda por que vendio mas de lo que tiene en mano.
+              COALESCE(SUM(CASE WHEN estado = 'emitida'
+                                THEN paciente_paga - abonado_inicial END), 0.00)        AS fiado,
               COALESCE(SUM(estado = 'anulada'), 0)                                      AS anuladas,
               COALESCE(SUM(CASE WHEN estado = 'anulada' THEN total END), 0.00)          AS monto_anulado
             FROM {DbNames.Factura}
@@ -59,23 +69,85 @@ public class CuadreRepository
         using var reader = await totalesCmd.ExecuteReaderAsync(ct);
         await reader.ReadAsync(ct);
 
+        var facturas = Convert.ToInt32(reader["facturas"]);
+        var vendido = reader.GetDecimal("vendido");
+        var efectivo = reader.GetDecimal("efectivo");
+        var tarjeta = reader.GetDecimal("tarjeta");
+        var transferencia = reader.GetDecimal("transferencia");
+        var mixto = reader.GetDecimal("mixto");
+        var fiado = reader.GetDecimal("fiado");
+        var anuladas = Convert.ToInt32(reader["anuladas"]);
+        var montoAnulado = reader.GetDecimal("monto_anulado");
+        await reader.CloseAsync();
+
+        // Los abonos de deudas viejas cobrados HOY por este cajero. Se suman a
+        // los totales por método de pago porque es plata que está en la caja,
+        // pero NO a `vendido`: no se facturó nada nuevo, se cobró algo viejo.
+        var abonos = await SumarAbonosDelDiaAsync(conexion, usuarioId, fecha, ct);
+        efectivo += abonos.Efectivo;
+        tarjeta += abonos.Tarjeta;
+        transferencia += abonos.Transferencia;
+        mixto += abonos.Mixto;
+
         var resumen = new CuadreResumen(
             usuarioId, nombreCajero, fecha,
-            Convert.ToInt32(reader["facturas"]),
-            reader.GetDecimal("vendido"),
-            reader.GetDecimal("efectivo"),
-            reader.GetDecimal("tarjeta"),
-            reader.GetDecimal("transferencia"),
-            reader.GetDecimal("mixto"),
-            Convert.ToInt32(reader["anuladas"]),
-            reader.GetDecimal("monto_anulado"),
+            facturas, vendido, efectivo, tarjeta, transferencia, mixto,
+            anuladas, montoAnulado,
             TiempoActivoSegundos: 0,
-            YaCerrado: false);
-        await reader.CloseAsync();
+            YaCerrado: false,
+            TotalFiado: fiado,
+            TotalAbonosRecibidos: abonos.Total);
 
         var tiempo = await CalcularTiempoActivoAsync(conexion, usuarioId, fecha, ct);
         var cerrado = await EstaCerradoAsync(conexion, usuarioId, fecha, ct);
         return resumen with { TiempoActivoSegundos = tiempo, YaCerrado = cerrado };
+    }
+
+    /// <summary>
+    /// Abonos de deudas viejas cobrados en un día, por método de pago.
+    /// </summary>
+    private record AbonosDelDia(decimal Efectivo, decimal Tarjeta,
+        decimal Transferencia, decimal Mixto)
+    {
+        public decimal Total => Efectivo + Tarjeta + Transferencia + Mixto;
+    }
+
+    /// <summary>
+    /// Lo que este cajero cobró hoy de deudas de OTROS días (012).
+    ///
+    /// Se excluyen los abonos de facturas ANULADAS: si la factura se anuló, esa
+    /// plata se devolvió y no puede seguir contando como caja del día. El abono
+    /// no se borra —queda el registro de que entró y salió—, simplemente no se
+    /// suma.
+    /// </summary>
+    private static async Task<AbonosDelDia> SumarAbonosDelDiaAsync(
+        MySqlConnection conexion, long usuarioId, DateOnly fecha, CancellationToken ct)
+    {
+        using var cmd = conexion.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT
+              COALESCE(SUM(CASE WHEN a.metodo_pago = 'efectivo'      THEN a.monto END), 0.00) AS efectivo,
+              COALESCE(SUM(CASE WHEN a.metodo_pago = 'tarjeta'       THEN a.monto END), 0.00) AS tarjeta,
+              COALESCE(SUM(CASE WHEN a.metodo_pago = 'transferencia' THEN a.monto END), 0.00) AS transferencia,
+              COALESCE(SUM(CASE WHEN a.metodo_pago = 'mixto'         THEN a.monto END), 0.00) AS mixto
+            FROM {DbNames.FacturaAbono} a
+            JOIN {DbNames.Factura} f ON f.id = a.factura_id
+            WHERE a.usuario_id = @usuarioId
+              AND f.estado = 'emitida'
+              AND DATE(DATE_SUB(a.fecha_utc, INTERVAL 4 HOUR)) = @fecha;
+            """;
+        cmd.Parameters.AddWithValue("@usuarioId", usuarioId);
+        cmd.Parameters.AddWithValue("@fecha", fecha.ToDateTime(TimeOnly.MinValue));
+
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return new AbonosDelDia(0m, 0m, 0m, 0m);
+
+        return new AbonosDelDia(
+            reader.GetDecimal("efectivo"),
+            reader.GetDecimal("tarjeta"),
+            reader.GetDecimal("transferencia"),
+            reader.GetDecimal("mixto"));
     }
 
     /// <summary>

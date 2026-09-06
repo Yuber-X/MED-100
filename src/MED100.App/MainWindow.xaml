@@ -1,8 +1,9 @@
 ﻿<Window x:Class="MED100.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:common="clr-namespace:MED100.Common;assembly=MED100.Common"
         xmlns:vm="clr-namespace:MED100.ViewModels;assembly=MED100.ViewModels"
-        Title="MED-100"
+        Title="{x:Static common:AppInfo.Nombre}"
         Width="1280" Height="760"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
@@ -34,7 +35,7 @@
                   HorizontalAlignment="Center" VerticalAlignment="Center"
                   Data="M 6,0 H 10 V 6 H 16 V 10 H 10 V 16 H 6 V 10 H 0 V 6 H 6 Z" />
           </Border>
-          <TextBlock Text="MED-100" Style="{DynamicResource Texto.Titulo3}"
+          <TextBlock Text="{x:Static common:AppInfo.Nombre}" Style="{DynamicResource Texto.Titulo3}"
                      VerticalAlignment="Center" Margin="10,0,0,0" />
           </StackPanel>
 
@@ -164,6 +165,14 @@
                                    ConverterParameter={x:Static vm:Pagina.Turnos}}"
                        Command="{Binding NavegarCommand}"
                        CommandParameter="{x:Static vm:Pagina.Turnos}" />
+          <RadioButton Content="Medicamentos" Tag="&#xEA8F;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Lo que el medico le indico a cada paciente. Es informacion de salud: solo la ve quien tiene el permiso."
+                       Visibility="{Binding PuedeVerIndicaciones, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Indicaciones}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Indicaciones}" />
           <!-- Almacén de expedientes: los papeles del paciente. Va pegado a
                Sala de espera porque las dos son del mostrador. -->
           <RadioButton Content="Expedientes" Tag="&#xE8A5;" Style="{DynamicResource Sidebar.Item}"
@@ -206,6 +215,14 @@
                                    ConverterParameter={x:Static vm:Pagina.Comprobantes}}"
                        Command="{Binding NavegarCommand}"
                        CommandParameter="{x:Static vm:Pagina.Comprobantes}" />
+          <RadioButton Content="Fiados" Tag="&#xE8C7;" Style="{DynamicResource Sidebar.Item}"
+                       ToolTip="Lo que los pacientes quedaron debiendo: cuanto falta, para cuando lo prometieron y quien esta atrasado."
+                       Visibility="{Binding PuedeVerFiados, Converter={StaticResource BoolAVisibilidad}}"
+                       IsChecked="{Binding PaginaActual, Mode=OneWay,
+                                   Converter={StaticResource Igualdad},
+                                   ConverterParameter={x:Static vm:Pagina.Fiados}}"
+                       Command="{Binding NavegarCommand}"
+                       CommandParameter="{x:Static vm:Pagina.Fiados}" />
           <RadioButton Content="Cuadre de caja" Tag="&#xE8C7;" Style="{DynamicResource Sidebar.Item}"
                        ToolTip="El cierre del día: cuánto entró por efectivo, tarjeta y transferencia, y cuánto cubrieron los seguros."
                        Visibility="{Binding PuedeVerCuadre, Converter={StaticResource BoolAVisibilidad}}"

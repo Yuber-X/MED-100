@@ -113,6 +113,20 @@ public static class TicketVisualFactory
                 panel.Children.Add(Fila("Cambio:", Moneda(cambio, negocio), FontWeights.Normal));
         }
         panel.Children.Add(Fila("Método de pago:", NombreMetodo(venta.MetodoPago), FontWeights.Normal));
+
+        // Fiado (012). Va en el papel que se lleva el paciente y no solo en el
+        // sistema: si el único registro de la deuda queda del lado de la
+        // clínica, discutirla después es la palabra de uno contra la del otro.
+        if (venta.QuedoFiado)
+        {
+            panel.Children.Add(Separador());
+            panel.Children.Add(Fila("Abonó hoy:", Moneda(venta.AbonadoInicial, negocio), FontWeights.Normal));
+            panel.Children.Add(Fila("QUEDA DEBIENDO:", Moneda(venta.SaldoPendiente, negocio),
+                FontWeights.Bold, 13));
+            if (venta.FechaCompromiso is { } compromiso)
+                panel.Children.Add(Fila("Se compromete a pagar:",
+                    compromiso.ToString("dd/MM/yyyy"), FontWeights.Bold));
+        }
         // El cajero va al final, junto al método de pago, como lo pidió la
         // clínica el 2026-08-27: es dato de quién cobró, no de quién atendió.
         panel.Children.Add(Fila("Cajero:", nombreCajero, FontWeights.Normal));

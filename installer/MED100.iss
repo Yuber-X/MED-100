@@ -1,4 +1,4 @@
-; =============================================================
+﻿; =============================================================
 ; MED-100 — Instalador (Inno Setup 6)
 ; Compilar:  ISCC.exe MED100.iss
 ; Requiere:  ..\publish\ generado con:
@@ -11,8 +11,20 @@
 ; Ver prerequisitos\LEEME.txt.
 ; =============================================================
 
-#define AppNombre "MED-100"
-#define AppVersion "1.1.0"
+; El nombre VISIBLE del producto (2026-09-06). "MED-100" era el provisional.
+#define AppNombre "MediControl"
+#define AppVersion "1.2.0"
+
+; ⚠ LA CARPETA DE DATOS NO CAMBIA CON EL NOMBRE. Ahi vive licencia.dat, el
+; ancla que recuerda desde cuando corre el demo de 15 dias. Si se renombrara,
+; toda instalacion ya activada empezaria la prueba de cero.
+#define CarpetaDatos "MED-100"
+
+; Bloquea la instalacion mientras la aplicacion este abierta. El mismo nombre
+; que registra App.xaml.cs. Sin esto, Windows difiere los archivos en uso al
+; proximo reinicio y el asistente termina diciendo "listo" sin haber cambiado
+; nada — que es exactamente lo que le paso a FAControl el 2026-09-05.
+#define AppMutexNombre "Global\MediControl.App.Instancia"
 #define AppEditor "Yuber Santana"
 #define AppExe "MED100.App.exe"
 #define AppTelefono "849-438-0242"
@@ -34,12 +46,13 @@
 AppId={{9A4C7D31-2E68-4B15-A0F9-MED100SYSTEM}
 AppName={#AppNombre}
 AppVersion={#AppVersion}
+AppMutex={#AppMutexNombre}
 AppPublisher={#AppEditor}
 AppSupportPhone={#AppTelefono}
 DefaultDirName={autopf}\{#AppNombre}
 DefaultGroupName={#AppNombre}
 OutputDir=Output
-OutputBaseFilename=MED100_Setup_{#AppVersion}
+OutputBaseFilename=MediControl_Setup_{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -59,7 +72,7 @@ Name: "escritorio"; Description: "Crear acceso directo en el escritorio"; \
 
 ; --- Prerequisitos: una casilla por programa, solo si el instalador esta presente ---
 #if TieneMySql
-Name: "prereq_mysql"; Description: "Instalar MySQL Server (la base de datos de MED-100)"; \
+Name: "prereq_mysql"; Description: "Instalar MySQL Server (la base de datos de {#AppNombre})"; \
   GroupDescription: "Programas necesarios:"
 #endif
 #if TieneAnyDesk
@@ -112,7 +125,7 @@ Name: "{app}\logs"; Permissions: users-modify
 ; acá y NO junto al .exe: desinstalar no debe reiniciar el demo. Va con
 ; users-modify porque la escribe quien abra la app — la recepcionista de la
 ; mañana y la de la tarde suelen ser cuentas de Windows distintas.
-Name: "{commonappdata}\{#AppNombre}"; Permissions: users-modify; Flags: uninsneveruninstall
+Name: "{commonappdata}\{#CarpetaDatos}"; Permissions: users-modify; Flags: uninsneveruninstall
 
 [Icons]
 Name: "{group}\{#AppNombre}"; Filename: "{app}\{#AppExe}"

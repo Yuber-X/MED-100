@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MED100.Common;
 using MED100.Models;
@@ -51,29 +51,29 @@ public partial class ActivacionViewModel : ObservableObject
         (Titulo, Explicacion) = estado.Estado switch
         {
             EstadoLicencia.Completa => (
-                "MED-100 está activado",
+                $"{AppInfo.Nombre} está activado",
                 "Esta computadora tiene la versión completa. No hay nada que hacer acá."),
 
             EstadoLicencia.Demo when estado.DiasRestantes == 1 => (
                 "Hoy es el último día de prueba",
-                "Mañana MED-100 va a pedir la llave para poder abrir. Tus datos no se " +
+                $"Mañana {AppInfo.Nombre} va a pedir la llave para poder abrir. Tus datos no se " +
                 "borran ni se pierden: quedan esperando en la base de datos y aparecen " +
                 "completos apenas se active."),
 
             EstadoLicencia.Demo => (
                 $"Prueba: quedan {estado.DiasRestantes} días",
-                "Podés usar MED-100 completo durante la prueba. Cuando se acabe, la app " +
+                $"Podés usar {AppInfo.Nombre} completo durante la prueba. Cuando se acabe, la app " +
                 "va a pedir la llave para abrir; los datos que cargues siguen ahí."),
 
             EstadoLicencia.RelojAtrasado => (
                 "La fecha de esta computadora está atrasada",
-                "MED-100 se abrió por última vez con una fecha posterior a la de hoy. " +
+                $"{AppInfo.Nombre} se abrió por última vez con una fecha posterior a la de hoy. " +
                 "Puede ser la pila del reloj o alguien que cambió la fecha a mano. " +
                 "Con la llave del producto se resuelve y no vuelve a molestar."),
 
             _ => (
                 "Se acabaron los 15 días de prueba",
-                "Para seguir usando MED-100 hay que activarlo con la llave del producto. " +
+                $"Para seguir usando {AppInfo.Nombre} hay que activarlo con la llave del producto. " +
                 "Nada se perdió: los pacientes, las citas y las facturas están completos " +
                 "y aparecen apenas se escriba la llave.")
         };

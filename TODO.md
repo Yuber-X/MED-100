@@ -1,6 +1,56 @@
-﻿# TODO — MED-100
+﻿# TODO — MED-100 (producto: MediControl)
 
 > Estado vivo del proyecto. Actualizar al cierre de cada bloque de trabajo.
+
+## Versión 1.2.0 (2026-09-06) — HECHA, falta prueba manual
+
+Decisiones que Yuber cerró el 2026-09-06 y quedaron implementadas:
+
+- [x] **Paleta médica**: los 3 colores del logo de la clínica en `Colores.xaml`
+      (`#0396D4` primario, `#29DAE2` acento, `#100062` navy)
+- [x] **Nombre del producto: MediControl**. Solo la capa visible, vía
+      `AppInfo.Nombre`. NO se tocó AppId, licencia.dat, namespaces ni la base
+- [x] **NCF como PrestControl**: `ncf_secuencia` (011) + sección en Configuración
+      + asignación automática al cobrar, atómica dentro de la transacción
+- [x] **Fiados** (012): `factura.abonado_inicial`, `fecha_compromiso`,
+      tabla `factura_abono`, pantalla Fiados con semáforo, permiso `fiados`,
+      cuadre de caja corregido, saldo en el ticket
+- [x] **Fiados en el aviso automático** por correo, junto a la caducidad
+- [x] **Medicamentos indicados** (013): `indicacion` + `indicacion_medicamento`,
+      pantalla por día, permiso `indicaciones`, auditoría, soft delete
+- [x] **AppMutex** `Global\MediControl.App.Instancia` en la app y en los dos .iss
+- [x] **Versión en la pantalla de inicio** + `Version`/`FileVersion` en el .csproj
+- [x] **Instalador 1.2.0** (`MediControl_Setup_1.2.0.exe`, 282 MB)
+- [x] **ACTUALIZADOR** (`MediControl_Update_1.2.0.exe`, 61 MB) con las tres
+      defensas del incidente de FAControl: AppMutex, CloseApplications y
+      comprobación de versión post-install
+- [x] Build Release sin warnings · verificador XAML OK · 343 tests pasando
+
+### Pruebas manuales de Yuber (1.2.0)
+- [ ] Cargar una secuencia NCF en Configuración, cobrar dejando el NCF vacío y
+      ver que asigna el siguiente; después escribir uno a mano y ver que la
+      secuencia se corre sola
+- [ ] Poner una secuencia con fin de rango ya alcanzado y confirmar que el cobro
+      se detiene con mensaje claro en vez de emitir sin comprobante
+- [ ] Cobrar dejando saldo: ver el saldo en el ticket impreso, que aparezca en
+      Fiados con su semáforo, y que el cuadre del día NO sume lo fiado
+- [ ] Cobrar un abono al día siguiente y confirmar que entra en el cuadre de ESE
+      día, no en el de la factura
+- [ ] Intentar fiar con un usuario sin el permiso `fiados` y ver que no puede
+- [ ] Cargar medicamentos indicados, verlos en el día, y confirmar que un usuario
+      sin el permiso `indicaciones` no ve la pantalla
+- [ ] **Probar el actualizador con la app ABIERTA**: tiene que negarse a instalar
+- [ ] Probar el actualizador con la app cerrada y confirmar "Versión 1.2.0" abajo
+      en la pantalla de inicio
+- [ ] Probar el actualizador en una PC sin MediControl instalado: debe negarse
+- [ ] Instalar el 1.2.0 completo en una PC limpia siguiendo INSTALL.md
+
+### Antes de entregarlo al cliente
+- [ ] Confirmarle el nombre **MediControl** antes de imprimir cualquier material
+- [ ] Cambiar el MySQL **web** (2 MB, necesita internet) de
+      `installer/prerequisitos/` por el **offline** de 593 MB, como en POS-500 v1.2.0
+- [ ] Actualizar `docs/MANUAL.md` con las pantallas nuevas (Fiados, Medicamentos)
+      y el nombre MediControl
 
 ## Fase 1 — Cimientos (COMPLETA salvo prueba manual)
 - [x] Estructura de solución (MED100.sln + 8 proyectos src + 2 tests, clonada de PrestControl)

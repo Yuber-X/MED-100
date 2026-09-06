@@ -1,16 +1,29 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- Marca principal (Indigo) — DESIGN.md §3 -->
-  <Color x:Key="Color.Indigo600">#4F46E5</Color>
-  <Color x:Key="Color.Indigo700">#312B94</Color>
-  <Color x:Key="Color.Indigo100">#E0E4FD</Color>
-  <Color x:Key="Color.Indigo50">#EEF0FE</Color>
+  <!-- Marca principal (azul clínico) — DESIGN.md §3
+       Sale del logo que mandó la clínica (2026-08-25): #0396D4 primario,
+       #29DAE2 acento, #100062 navy. Reemplaza al indigo heredado del POS-500.
+       El azul-cian es además el color con el que se lee "salud" en cualquier
+       parte, así que la marca del cliente y la convención del rubro coinciden.
+
+       Las claves siguen llamándose Indigo* a propósito: están referenciadas por
+       nombre en todas las vistas, y renombrarlas obligaría a tocar decenas de
+       XAML sin que se vea un solo píxel distinto. Lo que manda es el valor. -->
+  <Color x:Key="Color.Indigo600">#0396D4</Color>
+  <Color x:Key="Color.Indigo700">#0277A9</Color>
+  <Color x:Key="Color.Indigo100">#CCE9F7</Color>
+  <Color x:Key="Color.Indigo50">#EBF6FD</Color>
 
   <SolidColorBrush x:Key="Brush.Primario" Color="{StaticResource Color.Indigo600}" />
   <SolidColorBrush x:Key="Brush.PrimarioHover" Color="{StaticResource Color.Indigo700}" />
   <SolidColorBrush x:Key="Brush.PrimarioSuave" Color="{StaticResource Color.Indigo100}" />
   <SolidColorBrush x:Key="Brush.PrimarioSutil" Color="{StaticResource Color.Indigo50}" />
+
+  <!-- Acento y navy del logo. Disponibles para realces puntuales; NO se usan
+       como fondo de texto chico: el cian sobre blanco no llega a contraste AA. -->
+  <SolidColorBrush x:Key="Brush.Acento" Color="#29DAE2" />
+  <SolidColorBrush x:Key="Brush.Navy" Color="#100062" />
 
   <!-- Neutros -->
   <SolidColorBrush x:Key="Brush.FondoApp" Color="#FAFAF9" />

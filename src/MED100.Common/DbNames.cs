@@ -32,4 +32,17 @@ public static class DbNames
     public const string Turno = "turno";
     /// <summary>Expediente digital del paciente: la ficha del archivo, no el archivo.</summary>
     public const string DocumentoPaciente = "documento_paciente";
+
+    /// <summary>Rango de comprobantes fiscales autorizado por la DGII (011).</summary>
+    public const string NcfSecuencia = "ncf_secuencia";
+
+    /// <summary>Pagos posteriores a la emisión de una factura fiada (012).</summary>
+    public const string FacturaAbono = "factura_abono";
+
+    /// <summary>
+    /// Medicamentos que el médico indicó (013). Contenido clínico: leer
+    /// CLAUDE.md §1.1 y la cabecera de 013_indicaciones.sql antes de tocarlo.
+    /// </summary>
+    public const string Indicacion = "indicacion";
+    public const string IndicacionMedicamento = "indicacion_medicamento";
 }

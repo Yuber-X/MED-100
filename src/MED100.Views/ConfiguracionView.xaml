@@ -126,6 +126,82 @@
         </StackPanel>
       </Border>
 
+      <!-- ===== Comprobante fiscal (NCF) — 011 ===== -->
+      <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Comprobante fiscal (NCF)" Style="{DynamicResource Texto.Titulo3}" />
+          <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,16"
+                     Text="Sin esto, el NCF se escribe a mano en cada cobro (así funciona hoy). Si cargás acá el rango que te autorizó la DGII, dejar la casilla del NCF vacía al cobrar hace que la app asigne el siguiente sola. Escribir uno a mano sigue siendo posible siempre, y manda sobre la secuencia." />
+
+          <CheckBox Content="Asignar el NCF automáticamente desde una secuencia autorizada"
+                    IsChecked="{Binding NcfActivo}"
+                    FontSize="13" Foreground="{DynamicResource Brush.TextoPrincipal}" />
+
+          <StackPanel Margin="0,16,0,0"
+                      Visibility="{Binding NcfActivo, Converter={StaticResource BoolAVisibilidad}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Prefijo" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                         Text="{Binding NcfPrefijo, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Serie + tipo autorizado por la DGII. B02 = Consumidor Final, B01 = Crédito Fiscal, E32 = e-CF." />
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Largo de la secuencia" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                         Text="{Binding NcfLargoTexto, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Cuántos dígitos lleva el número: 8 en el NCF tradicional, 10 en el e-CF." />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Próximo número" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                         Text="{Binding NcfProximaTexto, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="El que se va a entregar en el siguiente cobro." />
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Fin del rango (opcional)" Style="{DynamicResource Input.Label}" />
+                <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                         Text="{Binding NcfFinTexto, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Último número autorizado. Dejalo vacío si no tenés tope; si lo cargás, la app avisa cuando queden pocos." />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Text="Vence el (opcional)" Style="{DynamicResource Input.Label}" Margin="0,12,0,0" />
+            <DatePicker SelectedDate="{Binding NcfVencimiento}" Margin="0,6,0,0" Height="40" FontSize="13" />
+          </StackPanel>
+
+          <!-- Siempre visible: con la casilla encendida dice en qué número va,
+               cuántos quedan y si venció; con la casilla apagada explica que el
+               NCF se escribe a mano. Es lo primero que se mira cuando un cobro
+               empieza a fallar por el comprobante. -->
+          <TextBlock Text="{Binding NcfEstadoTexto}" TextWrapping="Wrap" Margin="0,12,0,0"
+                     Style="{DynamicResource Texto.Caption}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+
+          <Button Content="Guardar comprobante fiscal"
+                  Style="{DynamicResource Boton.Primario}"
+                  HorizontalAlignment="Left" Margin="0,16,0,0"
+                  Command="{Binding GuardarNcfCommand}" />
+        </StackPanel>
+      </Border>
+
       <!-- ===== Seguros / ARS ===== -->
       <Border Style="{DynamicResource Card}" Padding="24" Margin="0,0,0,16">
         <StackPanel>
@@ -349,7 +425,7 @@
             <Run Text="La 'Contraseña de aplicación' NO es tu contraseña de Gmail: es un código de 16 letras que genera Google (la cuenta debe tener la verificación en 2 pasos activada). Pasos: 1) abrí " />
             <Hyperlink NavigateUri="https://myaccount.google.com/apppasswords"
                        RequestNavigate="Hyperlink_RequestNavigate">myaccount.google.com/apppasswords</Hyperlink>
-            <Run Text="; 2) escribí un nombre (ej: MED-100) y tocá 'Crear'; 3) copiá las 16 letras y pegalas acá (los espacios se quitan solos)." />
+            <Run Text="; 2) escribí un nombre (ej: MediControl) y tocá 'Crear'; 3) copiá las 16 letras y pegalas acá (los espacios se quitan solos)." />
           </TextBlock>
 
           <CheckBox Content="Activar el aviso de caducidad por correo" FontSize="13"
@@ -381,6 +457,22 @@
             <CheckBox Content="Enviar automáticamente al abrir el programa (una vez al día)"
                       FontSize="13" Margin="0,6,0,0"
                       IsChecked="{Binding RecordatoriosAutomaticos}" />
+
+            <!-- Fiados (012). Van en el MISMO correo que la caducidad y no en
+                 uno aparte: dos correos diarios del mismo sistema se dejan de
+                 leer los dos. -->
+            <CheckBox Content="Incluir también las deudas de pacientes (fiados)"
+                      FontSize="13" Margin="0,8,0,0"
+                      IsChecked="{Binding AvisoFiadosActivo}" />
+            <StackPanel Orientation="Horizontal" Margin="24,8,0,0"
+                        Visibility="{Binding AvisoFiadosActivo, Converter={StaticResource BoolAVisibilidad}}">
+              <TextBlock Text="Avisar con" Style="{DynamicResource Texto.Caption}"
+                         VerticalAlignment="Center" />
+              <TextBox Width="60" Height="30" Margin="8,0" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding AvisoFiadosDiasTexto, UpdateSourceTrigger=PropertyChanged}" />
+              <TextBlock Text="días de anticipación (las atrasadas salen siempre)"
+                         Style="{DynamicResource Texto.Caption}" VerticalAlignment="Center" />
+            </StackPanel>
 
             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
               <Button Content="Enviar aviso ahora" Style="{DynamicResource Boton.Primario}"

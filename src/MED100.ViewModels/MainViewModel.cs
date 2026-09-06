@@ -15,11 +15,13 @@ public enum Pagina
     Procedimientos,
     Citas,
     Turnos,
+    Indicaciones,
     Expedientes,
     Productos,
     Almacen,
     Caducidad,
     Comprobantes,
+    Fiados,
     Cuadre,
     Reportes,
     Usuarios,
@@ -44,11 +46,17 @@ public partial class MainViewModel : ObservableObject
         [Pagina.Procedimientos] = "procedimientos",
         [Pagina.Citas] = "citas",
         [Pagina.Turnos] = "turnos",
+        // Contenido clinico: hasta VER exige permiso (CLAUDE.md 1.1).
+        [Pagina.Indicaciones] = "indicaciones",
         [Pagina.Expedientes] = "expedientes",
         [Pagina.Productos] = "productos",
         [Pagina.Almacen] = "almacen",
         [Pagina.Caducidad] = "caducidad",
         [Pagina.Comprobantes] = "comprobantes",
+        // Ver la lista NO exige el permiso `fiados`: saber quien debe es algo que
+        // cualquiera en recepcion necesita para atender al paciente que llega.
+        // Lo que exige permiso es COBRAR o FIAR, y eso lo valida FiadoService.
+        [Pagina.Fiados] = "comprobantes",
         [Pagina.Cuadre] = "cuadre",
         [Pagina.Reportes] = "reportes",
         [Pagina.Usuarios] = "usuarios",
@@ -68,11 +76,13 @@ public partial class MainViewModel : ObservableObject
         [Pagina.Procedimientos] = "Procedimientos",
         [Pagina.Citas] = "Citas",
         [Pagina.Turnos] = "Sala de espera",
+        [Pagina.Indicaciones] = "Medicamentos indicados",
         [Pagina.Expedientes] = "Almacén de expedientes",
         [Pagina.Productos] = "Productos",
         [Pagina.Almacen] = "Almacén",
         [Pagina.Caducidad] = "Caducidad",
         [Pagina.Comprobantes] = "Buscar comprobante",
+        [Pagina.Fiados] = "Fiados",
         [Pagina.Cuadre] = "Cuadre de caja",
         [Pagina.Reportes] = "Reportes",
         [Pagina.Usuarios] = "Usuarios",
@@ -123,6 +133,8 @@ public partial class MainViewModel : ObservableObject
     public bool PuedeVerProductos => SesionActual.TienePermiso("productos");
     public bool PuedeVerAlmacen => SesionActual.TienePermiso("almacen");
     public bool PuedeVerCaducidad => SesionActual.TienePermiso("caducidad");
+    public bool PuedeVerFiados => SesionActual.TienePermiso("comprobantes");
+    public bool PuedeVerIndicaciones => SesionActual.TienePermiso("indicaciones");
     public bool PuedeVerComprobantes => SesionActual.TienePermiso("comprobantes");
     public bool PuedeVerCuadre => SesionActual.TienePermiso("cuadre");
     public bool PuedeVerReportes => SesionActual.TienePermiso("reportes");

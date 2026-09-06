@@ -7,14 +7,16 @@ using Serilog;
 
 namespace MED100.Services;
 
-/// <summary>Resultado de una tanda de avisos de caducidad.</summary>
+/// <summary>Resultado de una tanda de avisos.</summary>
 public record ResultadoAvisoCaducidad(
     int Caducados,
     int PorCaducar,
     bool CorreoEnviado,
-    string Detalle)
+    string Detalle,
+    /// <summary>Deudas de pacientes atrasadas o por vencer (012).</summary>
+    int FiadosEnRiesgo = 0)
 {
-    public int Total => Caducados + PorCaducar;
+    public int Total => Caducados + PorCaducar + FiadosEnRiesgo;
 }
 
 /// <summary>
@@ -37,21 +39,32 @@ public record ResultadoAvisoCaducidad(
 /// NO manda correo si no hay nada que avisar: un correo diario diciendo "todo
 /// bien" se convierte en ruido y se deja de leer, que es justo lo contrario de
 /// lo que se busca.
+///
+/// <b>DESDE LA 012 TAMBIÉN AVISA DE LOS FIADOS</b> (pedido de Yuber, 2026-09-06:
+/// <i>"parecido a los préstamos a punto de caducar, pero orientado a los fiados
+/// a clientes… habrá que agregarlos a notificaciones automáticas"</i>).
+///
+/// Van en el MISMO correo y no en uno aparte, y esa es la decisión importante:
+/// dos correos diarios del mismo sistema se dejan de leer los dos. El nombre de
+/// la clase quedó de cuando solo miraba la mercancía; hoy es el aviso diario del
+/// negocio.
 /// </summary>
 public class RecordatorioCaducidadService
 {
     private static readonly CultureInfo CulturaRd = CultureInfo.GetCultureInfo("es-DO");
 
     private readonly ProductoRepository _productos;
+    private readonly FiadoRepository _fiados;
     private readonly EmailService _email;
     private readonly AjustesLocales _ajustes;
     /// <summary>El nombre del negocio firma el correo; vive en la BD, no en ajustes.json.</summary>
     private readonly ConfiguracionNegocioService _negocio;
 
-    public RecordatorioCaducidadService(ProductoRepository productos, EmailService email,
-        AjustesLocales ajustes, ConfiguracionNegocioService negocio)
+    public RecordatorioCaducidadService(ProductoRepository productos, FiadoRepository fiados,
+        EmailService email, AjustesLocales ajustes, ConfiguracionNegocioService negocio)
     {
         _productos = productos;
+        _fiados = fiados;
         _email = email;
         _ajustes = ajustes;
         _negocio = negocio;
@@ -84,34 +97,67 @@ public class RecordatorioCaducidadService
         var caducados = enRiesgo.Count(p => p.FechaCaducidad!.Value < hoy);
         var porCaducar = enRiesgo.Count - caducados;
 
-        if (enRiesgo.Count == 0)
+        // Deudas atrasadas o que vencen dentro de la ventana configurada. Las
+        // que no tienen fecha acordada quedan FUERA: no están atrasadas, y
+        // meterlas todos los días convertiría el aviso en una lista fija que
+        // nadie mira.
+        var fiados = await ObtenerFiadosEnRiesgoAsync(hoy, ct);
+
+        if (enRiesgo.Count == 0 && fiados.Count == 0)
         {
             _ajustes.UltimoRecordatorioUtc = DateTime.UtcNow;
             _ajustes.Guardar();
             return new ResultadoAvisoCaducidad(0, 0, false,
-                $"No hay productos caducados ni por caducar en los próximos " +
-                $"{_ajustes.AvisoCaducidadDias} días. No se envió correo.");
+                "No hay productos por caducar ni deudas por vencer. No se envió correo.");
         }
 
         try
         {
-            await _email.EnviarAsync(_ajustes.CorreoDueno, Asunto(caducados, porCaducar),
-                Cuerpo(enRiesgo, hoy, caducados), ct);
+            await _email.EnviarAsync(_ajustes.CorreoDueno,
+                Asunto(caducados, porCaducar, fiados.Count),
+                Cuerpo(enRiesgo, hoy, caducados, fiados), ct);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "No se pudo enviar el aviso de caducidad al dueño");
+            Log.Error(ex, "No se pudo enviar el aviso diario al dueño");
             return new ResultadoAvisoCaducidad(caducados, porCaducar, false,
-                $"No se pudo enviar el correo: {ex.Message}");
+                $"No se pudo enviar el correo: {ex.Message}", fiados.Count);
         }
 
         _ajustes.UltimoRecordatorioUtc = DateTime.UtcNow;
         _ajustes.Guardar();
 
-        Log.Information("Aviso de caducidad enviado: {Caducados} caducados, {PorCaducar} por caducar",
-            caducados, porCaducar);
+        Log.Information("Aviso diario enviado: {Caducados} caducados, {PorCaducar} por caducar, {Fiados} deudas",
+            caducados, porCaducar, fiados.Count);
         return new ResultadoAvisoCaducidad(caducados, porCaducar, true,
-            $"Resumen enviado a {_ajustes.CorreoDueno}.");
+            $"Resumen enviado a {_ajustes.CorreoDueno}.", fiados.Count);
+    }
+
+    /// <summary>
+    /// Deudas que hay que reclamar: ya atrasadas, o que vencen dentro de la
+    /// ventana configurada. Un fallo leyéndolas NO tumba el aviso de caducidad
+    /// —son dos avisos independientes que comparten el sobre—, así que se
+    /// registra y se sigue con la lista vacía.
+    /// </summary>
+    private async Task<IReadOnlyList<FiadoResumen>> ObtenerFiadosEnRiesgoAsync(
+        DateOnly hoy, CancellationToken ct)
+    {
+        if (!_ajustes.AvisoFiadosActivo)
+            return [];
+
+        try
+        {
+            var limite = hoy.AddDays(Math.Max(0, _ajustes.AvisoFiadosDias));
+            return (await _fiados.ObtenerPendientesAsync(ct))
+                .Where(f => f.FechaCompromiso is { } fecha && fecha <= limite)
+                .OrderBy(f => f.FechaCompromiso)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "No se pudieron leer los fiados para el aviso diario");
+            return [];
+        }
     }
 
     /// <summary>Envío automático al entrar al punto de venta (una vez por día).</summary>
@@ -139,15 +185,60 @@ public class RecordatorioCaducidadService
         }
     }
 
-    private static string Asunto(int caducados, int porCaducar) => caducados > 0
-        ? $"URGENTE: {caducados} producto(s) CADUCADO(S) en el inventario"
-        : $"{porCaducar} producto(s) por caducar";
+    /// <summary>
+    /// El asunto nombra lo MÁS urgente que haya. Un asunto que enumera todo se
+    /// vuelve ilegible en el teléfono, que es donde se lee.
+    /// </summary>
+    private static string Asunto(int caducados, int porCaducar, int fiados)
+    {
+        if (caducados > 0)
+            return $"URGENTE: {caducados} producto(s) CADUCADO(S) en el inventario";
+        if (porCaducar > 0 && fiados > 0)
+            return $"{porCaducar} producto(s) por caducar y {fiados} deuda(s) por cobrar";
+        if (porCaducar > 0)
+            return $"{porCaducar} producto(s) por caducar";
+        return $"{fiados} deuda(s) de pacientes por cobrar";
+    }
 
-    private string Cuerpo(IReadOnlyList<Producto> productos, DateOnly hoy, int caducados)
+    private string Cuerpo(IReadOnlyList<Producto> productos, DateOnly hoy, int caducados,
+        IReadOnlyList<FiadoResumen> fiados)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Estado de la mercancía al {hoy.ToString(@"dd'/'MM'/'yyyy", CulturaRd)}:");
+        sb.AppendLine($"Estado de la clínica al {hoy.ToString(@"dd'/'MM'/'yyyy", CulturaRd)}:");
         sb.AppendLine();
+
+        if (fiados.Count > 0)
+        {
+            // Las deudas van PRIMERO: es plata de la clínica que está afuera, y
+            // a diferencia de un insumo por vencer, se recupera llamando hoy.
+            var atrasadas = fiados.Where(f => f.FechaCompromiso!.Value < hoy).ToList();
+            var deudasPorVencer = fiados.Where(f => f.FechaCompromiso!.Value >= hoy).ToList();
+
+            if (atrasadas.Count > 0)
+            {
+                sb.AppendLine($"=== DEUDAS ATRASADAS ({atrasadas.Count}) — llamar ===");
+                foreach (var f in atrasadas)
+                    sb.AppendLine(LineaFiado(f, hoy));
+                sb.AppendLine();
+            }
+
+            if (deudasPorVencer.Count > 0)
+            {
+                sb.AppendLine($"=== DEUDAS POR VENCER en {_ajustes.AvisoFiadosDias} días ({deudasPorVencer.Count}) ===");
+                foreach (var f in deudasPorVencer)
+                    sb.AppendLine(LineaFiado(f, hoy));
+                sb.AppendLine();
+            }
+
+            sb.AppendLine($"Total por cobrar: RD$ {fiados.Sum(f => f.Saldo).ToString("N2", CulturaRd)}.");
+            sb.AppendLine();
+        }
+
+        if (productos.Count == 0)
+        {
+            sb.AppendLine(_negocio.Actual.NombreNegocio);
+            return sb.ToString();
+        }
 
         if (caducados > 0)
         {
@@ -174,6 +265,21 @@ public class RecordatorioCaducidadService
         sb.AppendLine();
         sb.AppendLine(_negocio.Actual.NombreNegocio);
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Una deuda en el correo. Lleva el teléfono adelante porque la acción que
+    /// se espera es llamar, y buscarlo en el sistema es justo la fricción que
+    /// hace que no se llame.
+    /// </summary>
+    private static string LineaFiado(FiadoResumen f, DateOnly hoy)
+    {
+        var tel = string.IsNullOrWhiteSpace(f.ClienteTelefono)
+            ? "sin teléfono"
+            : f.ClienteTelefono;
+        return $"• {f.ClienteNombre} ({tel}) — debe RD$ {f.Saldo.ToString("N2", CulturaRd)} " +
+               $"de {f.NumeroFactura} — " +
+               $"{CalculadoraFiado.DescribirVencimiento(f.FechaCompromiso, hoy)}";
     }
 
     private static string Linea(Producto p, DateOnly hoy)

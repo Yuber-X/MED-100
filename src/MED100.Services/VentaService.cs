@@ -23,10 +23,12 @@ public class VentaService
     private readonly ArsRepository _ars;
     private readonly ConfiguracionNegocioService _config;
     private readonly AuditoriaService _auditoria;
+    private readonly NcfService _ncf;
 
     public VentaService(FacturaRepository facturas, ClienteRepository clientes,
         MedicoRepository medicos, ArsRepository ars,
-        ConfiguracionNegocioService config, AuditoriaService auditoria)
+        ConfiguracionNegocioService config, AuditoriaService auditoria,
+        NcfService ncf)
     {
         _facturas = facturas;
         _clientes = clientes;
@@ -34,6 +36,7 @@ public class VentaService
         _ars = ars;
         _config = config;
         _auditoria = auditoria;
+        _ncf = ncf;
     }
 
     // ------------------------------------------------------------------
@@ -88,16 +91,24 @@ public class VentaService
         // los 1500 sería un error de cobro en el mostrador.
         var aCobrar = ars.PacientePaga;
 
+        // ---- Fiado (012) -----------------------------------------------
+        // Lo que de verdad entra AHORA. Si no se indicó nada, entra todo, que
+        // es el caso normal y deja el comportamiento anterior intacto.
+        var abonado = ValidarFiado(solicitud, aCobrar);
+
         decimal? efectivo = null, cambio = null;
         if (solicitud.MetodoPago is MetodoPagoFactura.Efectivo)
         {
             if (solicitud.EfectivoRecibido is not { } recibido)
                 throw new ArgumentException("Indica el efectivo recibido.");
-            if (recibido < aCobrar)
+            // Se compara contra lo que se está ABONANDO, no contra la deuda
+            // entera: en un fiado el paciente entrega menos a propósito, y
+            // exigirle el total acá haría imposible fiar en efectivo.
+            if (recibido < abonado)
                 throw new ArgumentException(
-                    $"El efectivo recibido no cubre lo que paga el paciente ({aCobrar:0.00}).");
+                    $"El efectivo recibido no cubre lo que el paciente está pagando ({abonado:0.00}).");
             efectivo = recibido;
-            cambio = CalcularCambio(recibido, aCobrar);
+            cambio = CalcularCambio(recibido, abonado);
         }
         else if (solicitud.MetodoPago is MetodoPagoFactura.Mixto)
         {
@@ -107,10 +118,27 @@ public class VentaService
 
         var ahoraUtc = DateTime.UtcNow;
 
+        // ---- Comprobante fiscal (011) ----------------------------------
+        // Manda lo que escribió el cajero. Si dejó la caja vacía, se toma el
+        // siguiente de la secuencia autorizada, pero SOLO si hay una cargada:
+        // cuando no la hay, la factura sale sin NCF igual que siempre, que es
+        // un recibo interno perfectamente válido.
+        var ncfManual = string.IsNullOrWhiteSpace(solicitud.Ncf)
+            ? null
+            : solicitud.Ncf.Trim().ToUpperInvariant();
+        var haySecuencia = ncfManual is null && await _ncf.ObtenerSecuenciaAsync(ct) is { Activo: true };
+
         using var conexion = await _facturas.AbrirConexionAsync(ct);
         using var transaccion = await conexion.BeginTransactionAsync(ct);
         try
         {
+            // Dentro de la transacción y con FOR UPDATE: dos cajeros cobrando a
+            // la vez no pueden recibir el mismo comprobante, y si la venta falla
+            // más abajo el número no se consume. Un NCF quemado no se recupera.
+            var ncfFinal = haySecuencia
+                ? await NcfRepository.ReservarSiguienteAsync(conexion, transaccion, FechaNegocio.Hoy, ct)
+                : ncfManual;
+
             var numero = await ConfiguracionNegocioRepository.ReservarNumeroFacturaAsync(conexion, transaccion, ct);
             var numeroFactura = FormatearNumeroFactura(
                 cfg.FacturaPrefijo, numero, cfg.FacturaFormato, FechaNegocio.Hoy.Year);
@@ -129,7 +157,7 @@ public class VentaService
             var facturaId = await FacturaRepository.InsertarFacturaAsync(
                 conexion, transaccion, numeroFactura, solicitud.ClienteId, SesionActual.Id,
                 ahoraUtc, totales, solicitud.MetodoPago, efectivo, cambio,
-                honorario, ars, solicitud.Ncf, ct);
+                honorario, ars, ncfFinal, abonado, solicitud.FechaCompromiso, ct);
 
             foreach (var linea in solicitud.Lineas)
                 await FacturaRepository.InsertarDetalleAsync(conexion, transaccion, facturaId, linea, ct);
@@ -140,10 +168,16 @@ public class VentaService
                 await FacturaRepository.EnlazarCitaAsync(conexion, transaccion, citaId, facturaId, ct);
 
             await _auditoria.RegistrarEnTransaccionAsync(AccionAuditoria.Crear, DbNames.Factura, facturaId,
-                Describir(numeroFactura, solicitud, totales, honorario, ars),
+                Describir(numeroFactura, solicitud, totales, honorario, ars, ncfFinal),
                 conexion, transaccion, ct);
 
             await transaccion.CommitAsync(ct);
+
+            // DESPUÉS del commit y sin propagar: si el cajero pegó un NCF a mano,
+            // la secuencia se corre para seguir a partir de ese. Que eso falle no
+            // puede mostrarle un error por un cobro que ya se guardó bien.
+            if (ncfManual is not null)
+                await _ncf.AdoptarComoPredeterminadaAsync(ncfManual, ct);
 
             string? nombreCliente = null;
             if (solicitud.ClienteId is { } clienteId)
@@ -151,7 +185,8 @@ public class VentaService
 
             return new VentaResultado(facturaId, numeroFactura, ahoraUtc, totales,
                 efectivo, cambio, solicitud.Lineas, nombreCliente, solicitud.MetodoPago,
-                honorario, ars, solicitud.Ncf, solicitud.ClienteId);
+                honorario, ars, ncfFinal, solicitud.ClienteId,
+                abonado, solicitud.FechaCompromiso);
         }
         catch
         {
@@ -199,8 +234,51 @@ public class VentaService
             solicitud.ArsAutorizacion, solicitud.ArsCubierto);
     }
 
+    /// <summary>
+    /// Comprueba el fiado y devuelve lo que entra a la caja AHORA.
+    ///
+    /// Sin <c>AbonadoInicial</c> entra todo: es el camino de siempre y no pide
+    /// permiso ni fecha, porque no hay deuda que administrar.
+    /// </summary>
+    private static decimal ValidarFiado(VentaSolicitud solicitud, decimal aCobrar)
+    {
+        if (solicitud.AbonadoInicial is not { } abonado)
+            return aCobrar;
+
+        if (abonado < 0m)
+            throw new ArgumentException("Lo que entrega el paciente no puede ser negativo.");
+
+        if (abonado > aCobrar)
+            throw new ArgumentException(
+                $"El paciente no puede abonar más de lo que debe ({aCobrar:0.00}). " +
+                "Un pago por adelantado contra consultas futuras no se registra acá.");
+
+        // Pagó todo: no es un fiado aunque se haya llegado por este camino.
+        if (abonado == aCobrar)
+            return abonado;
+
+        if (!SesionActual.TienePermiso("fiados"))
+            throw new InvalidOperationException(
+                "No tienes permiso para dejar una factura con saldo pendiente. " +
+                "Pedile a un administrador que la cobre o que te dé el permiso.");
+
+        // La fecha es OBLIGATORIA y no es burocracia: es de donde sale el
+        // semáforo y el aviso automático. Una deuda sin fecha no le aparece a
+        // nadie nunca, y el fiado se descubre meses después revisando papeles.
+        if (solicitud.FechaCompromiso is not { } compromiso)
+            throw new ArgumentException(
+                "Indicá para cuándo se compromete a pagar. Sin fecha, la deuda no " +
+                "aparece en los avisos y se pierde de vista.");
+
+        if (compromiso < FechaNegocio.Hoy)
+            throw new ArgumentException(
+                "La fecha de pago no puede ser anterior a hoy: nacería atrasada.");
+
+        return abonado;
+    }
+
     private static string Describir(string numeroFactura, VentaSolicitud solicitud,
-        VentaTotales totales, HonorarioMedico? honorario, RepartoArs ars)
+        VentaTotales totales, HonorarioMedico? honorario, RepartoArs ars, string? ncf)
     {
         var texto = $"Factura {numeroFactura} emitida: {solicitud.Lineas.Count} líneas, " +
                     $"total {totales.Total:0.00}";
@@ -208,8 +286,8 @@ public class VentaService
             texto += $" · honorario {honorario.MedicoNombre} {honorario.Porcentaje:0.##}% = {honorario.Monto:0.00}";
         if (ars.ArsId is not null)
             texto += $" · {ars.ArsNombre} cubre {ars.Cubierto:0.00}, paciente {ars.PacientePaga:0.00}";
-        if (!string.IsNullOrWhiteSpace(solicitud.Ncf))
-            texto += $" · NCF {solicitud.Ncf}";
+        if (!string.IsNullOrWhiteSpace(ncf))
+            texto += $" · NCF {ncf}";
         return texto;
     }
 

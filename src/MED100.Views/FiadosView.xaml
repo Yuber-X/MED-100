@@ -1,0 +1,184 @@
+﻿<UserControl x:Class="MED100.Views.FiadosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:MED100.Models;assembly=MED100.Models">
+
+  <UserControl.Resources>
+    <!-- Semáforo de la deuda. Los mismos colores que FAControl usa para las
+         cuotas: quien mira las dos pantallas no aprende dos códigos. -->
+    <Style x:Key="Pastilla.Fiado" TargetType="Border">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Background" Value="{DynamicResource Brush.AlDia.Fondo}" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.PorVencer}">
+          <Setter Property="Background" Value="{DynamicResource Brush.PorVencer.Fondo}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.Vencido}">
+          <Setter Property="Background" Value="{DynamicResource Brush.Vencido.Fondo}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.EnMora}">
+          <Setter Property="Background" Value="{DynamicResource Brush.EnMora.Fondo}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.Pagado}">
+          <Setter Property="Background" Value="{DynamicResource Brush.Pagado.Fondo}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="Pastilla.Fiado.Texto" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.AlDia.Texto}" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.PorVencer}">
+          <Setter Property="Foreground" Value="{DynamicResource Brush.PorVencer.Texto}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.Vencido}">
+          <Setter Property="Foreground" Value="{DynamicResource Brush.Vencido.Texto}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.EnMora}">
+          <Setter Property="Foreground" Value="{DynamicResource Brush.EnMora.Texto}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Semaforo}" Value="{x:Static models:SemaforoFiado.Pagado}">
+          <Setter Property="Foreground" Value="{DynamicResource Brush.Pagado.Texto}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="24" />
+      <ColumnDefinition Width="320" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ===== Totales ===== -->
+    <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+            Style="{DynamicResource Card}" Padding="20" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal">
+        <StackPanel Margin="0,0,40,0">
+          <TextBlock Text="Total por cobrar" Style="{DynamicResource Texto.Caption}" />
+          <TextBlock Style="{DynamicResource Texto.Titulo2}" Margin="0,2,0,0">
+            <Run Text="RD$ " /><Run Text="{Binding TotalPendienteTexto, Mode=OneWay}" />
+          </TextBlock>
+        </StackPanel>
+        <StackPanel>
+          <TextBlock Text="Atrasados" Style="{DynamicResource Texto.Caption}" />
+          <TextBlock Text="{Binding CantidadAtrasados, Mode=OneWay}"
+                     Style="{DynamicResource Texto.Titulo2}" Margin="0,2,0,0"
+                     Foreground="{DynamicResource Brush.EnMora.Texto}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- ===== Filtros ===== -->
+    <Grid Grid.Row="1" Grid.Column="0" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="16" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+               Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+               ToolTip="Buscá por paciente, número de factura o teléfono." />
+      <CheckBox Grid.Column="2" Content="Solo atrasados"
+                IsChecked="{Binding SoloAtrasados}"
+                VerticalAlignment="Center" FontSize="13"
+                Foreground="{DynamicResource Brush.TextoPrincipal}" />
+    </Grid>
+
+    <!-- ===== Lista ===== -->
+    <Border Grid.Row="2" Grid.Column="0" Style="{DynamicResource Card}" Padding="0">
+      <DataGrid ItemsSource="{Binding Fiados}"
+                SelectedItem="{Binding Seleccionada}"
+                AutoGenerateColumns="False" IsReadOnly="True"
+                HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                CanUserResizeRows="False" SelectionMode="Single">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Paciente" Binding="{Binding ClienteNombre}" Width="*" />
+          <DataGridTextColumn Header="Teléfono" Binding="{Binding Telefono}" Width="120" />
+          <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}" Width="110" />
+          <DataGridTextColumn Header="Debe" Binding="{Binding SaldoTexto}" Width="100" />
+          <DataGridTemplateColumn Header="Vencimiento" Width="170">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource Pastilla.Fiado}" Margin="0,4">
+                  <TextBlock Text="{Binding Vencimiento}"
+                             Style="{StaticResource Pastilla.Fiado.Texto}" />
+                </Border>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- ===== Cobrar ===== -->
+    <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="2"
+            Style="{DynamicResource Card}" Padding="20" VerticalAlignment="Top">
+      <StackPanel>
+        <TextBlock Text="Cobrar deuda" Style="{DynamicResource Texto.Titulo3}" />
+
+        <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Text="Elegí un paciente en la lista para cobrarle."
+                   Visibility="{Binding HaySeleccion, Converter={StaticResource InversorBoolVisibilidad}}" />
+
+        <StackPanel Visibility="{Binding HaySeleccion, Converter={StaticResource BoolAVisibilidad}}">
+          <TextBlock Text="{Binding Seleccionada.ClienteNombre}" Margin="0,10,0,0"
+                     Style="{DynamicResource Texto.Cuerpo}" FontWeight="SemiBold"
+                     TextWrapping="Wrap" />
+          <TextBlock Style="{DynamicResource Texto.Caption}" Margin="0,2,0,0">
+            <Run Text="Factura " /><Run Text="{Binding Seleccionada.NumeroFactura, Mode=OneWay}" />
+            <Run Text=" del " /><Run Text="{Binding Seleccionada.FechaEmisionTexto, Mode=OneWay}" />
+          </TextBlock>
+          <TextBlock Style="{DynamicResource Texto.Caption}" Margin="0,2,0,0">
+            <Run Text="Pagado RD$ " /><Run Text="{Binding Seleccionada.PagadoTexto, Mode=OneWay}" />
+            <Run Text=" de RD$ " /><Run Text="{Binding Seleccionada.TotalTexto, Mode=OneWay}" />
+          </TextBlock>
+
+          <TextBlock Text="Debe" Style="{DynamicResource Input.Label}" Margin="0,12,0,0" />
+          <TextBlock Style="{DynamicResource Texto.Titulo2}" Margin="0,2,0,0"
+                     Foreground="{DynamicResource Brush.EnMora.Texto}">
+            <Run Text="RD$ " /><Run Text="{Binding Seleccionada.SaldoTexto, Mode=OneWay}" />
+          </TextBlock>
+
+          <!-- Todo lo que sigue solo tiene sentido con el permiso `fiados`. Sin
+               él la ficha se ve igual —recepción necesita poder mirarla— pero
+               no se puede tocar la plata. -->
+          <StackPanel Visibility="{Binding PuedeCobrar, Converter={StaticResource BoolAVisibilidad}}">
+            <TextBlock Text="Está pagando" Style="{DynamicResource Input.Label}" Margin="0,14,0,0" />
+            <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                     Text="{Binding MontoAbono, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Text="Método de pago" Style="{DynamicResource Input.Label}" Margin="0,10,0,0" />
+            <ComboBox Height="40" FontSize="13" Margin="0,6,0,0"
+                      ItemsSource="{Binding MetodosPago}"
+                      SelectedItem="{Binding MetodoAbono}" />
+
+            <TextBlock Text="Nota (opcional)" Style="{DynamicResource Input.Label}" Margin="0,10,0,0" />
+            <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
+                     Text="{Binding NotasAbono, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button Content="Cobrar" Style="{DynamicResource Boton.Primario}"
+                    Margin="0,16,0,0" HorizontalAlignment="Stretch"
+                    Command="{Binding CobrarAbonoCommand}"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+
+            <Button Content="Mover la fecha de pago" Style="{DynamicResource Boton.Secundario}"
+                    Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                    Command="{Binding MoverFechaCommand}"
+                    IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+          </StackPanel>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

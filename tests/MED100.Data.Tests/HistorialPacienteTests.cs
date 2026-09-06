@@ -57,7 +57,8 @@ public class HistorialPacienteTests : IAsyncLifetime
         _pacientes = new ClienteService(new ClienteRepository(_factory),
             new HistorialRepository(_factory), auditoria);
         _ventas = new VentaService(facturaRepo, new ClienteRepository(_factory),
-            medicosRepo, new ArsRepository(_factory), negocio, auditoria);
+            medicosRepo, new ArsRepository(_factory), negocio, auditoria,
+            new NcfService(new NcfRepository(_factory), auditoria));
         _facturas = new FacturaService(facturaRepo, auditoria);
         _citas = new CitaService(new CitaRepository(_factory), medicosRepo,
             new ProcedimientoRepository(_factory), auditoria);

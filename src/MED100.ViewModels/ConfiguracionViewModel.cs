@@ -48,6 +48,8 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
     private readonly ArsService _arsServicio;
     /// <summary>Demo de 15 días o versión completa.</summary>
     private readonly LicenciaService _licencias;
+    /// <summary>Secuencia de comprobantes autorizada por la DGII (011).</summary>
+    private readonly NcfService _ncf;
 
     /// <summary>El shell reescala la UI cuando cambia el tamaño de texto.</summary>
     public event Action<double>? EscalaCambiada;
@@ -76,7 +78,7 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
             : estado.Etiqueta;
         LicenciaDetalle = LicenciaActivada
             ? "Esta computadora está activada. No caduca."
-            : $"Quedan {estado.DiasRestantes} días de prueba. Cuando se acaben, MED-100 " +
+            : $"Quedan {estado.DiasRestantes} días de prueba. Cuando se acaben, {AppInfo.Nombre} " +
               "pedirá la llave del producto para abrir; los datos siguen intactos.";
     }
 
@@ -86,7 +88,7 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
     public ConfiguracionViewModel(ConfiguracionNegocioService config, RespaldoService respaldos,
         ExportacionService exportacion, AjustesLocales ajustes, IDialogService dialogos,
         RecordatorioCaducidadService avisos, RecordatorioCitasService recordatorioCitas,
-        ArsService arsServicio, LicenciaService licencias)
+        ArsService arsServicio, LicenciaService licencias, NcfService ncf)
     {
         _config = config;
         _respaldos = respaldos;
@@ -97,6 +99,7 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
         _recordatorioCitas = recordatorioCitas;
         _arsServicio = arsServicio;
         _licencias = licencias;
+        _ncf = ncf;
         _licencias.Cambio += RefrescarLicencia;
         RefrescarLicencia();   // el evento solo avisa de los cambios: el estado inicial se lee acá
 
@@ -107,6 +110,8 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
         _recordatoriosAutomaticos = ajustes.RecordatoriosAutomaticos;
         _gmailRemitente = ajustes.GmailRemitente;
         _correoDueno = ajustes.CorreoDueno;
+        _avisoFiadosActivo = ajustes.AvisoFiadosActivo;
+        _avisoFiadosDiasTexto = ajustes.AvisoFiadosDias.ToString(CulturaDo);
         _hayAppPasswordGuardada = !string.IsNullOrWhiteSpace(ajustes.GmailAppPasswordCifrada);
         _recordatorioCitasActivo = ajustes.RecordatorioCitasActivo;
         _recordatorioCitasHorasTexto = ajustes.RecordatorioCitasHorasAntes.ToString(CultureInfo.InvariantCulture);
@@ -286,7 +291,198 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
             : "Nunca";
 
         MensajeError = MensajeExito = string.Empty;
-        return CargarArsAsync();
+        return Task.WhenAll(CargarArsAsync(), CargarNcfAsync());
+    }
+
+    // ============================================================
+    // Comprobante fiscal (NCF) — 011, portado de FAControl
+    // ============================================================
+    // Vive en la BD (ncf_secuencia), no en ajustes.json: el rango que autorizó
+    // la DGII es del NEGOCIO, no de esta computadora. Si mañana la clínica pone
+    // una segunda terminal, las dos tienen que tomar números del mismo libro.
+
+    [ObservableProperty] private bool _ncfActivo;
+    [ObservableProperty] private string _ncfPrefijo = "B02";
+    [ObservableProperty] private string _ncfLargoTexto = "8";
+    [ObservableProperty] private string _ncfProximaTexto = "1";
+    [ObservableProperty] private string _ncfFinTexto = string.Empty;
+    [ObservableProperty] private DateTime? _ncfVencimiento;
+    [ObservableProperty] private string _ncfEstadoTexto = string.Empty;
+
+    /// <summary>
+    /// True mientras <see cref="CargarNcfAsync"/> llena los campos desde la
+    /// base. Sin esto, poner <see cref="NcfActivo"/> en true al cargar una
+    /// secuencia guardada dispararía el borrado y la pantalla arrancaría vacía.
+    /// </summary>
+    private bool _cargandoNcf;
+
+    public async Task CargarNcfAsync()
+    {
+        try
+        {
+            _cargandoNcf = true;
+            var secuencia = await _ncf.ObtenerSecuenciaAsync();
+            if (secuencia is null)
+            {
+                LimpiarNcf();
+                return;
+            }
+            NcfActivo = secuencia.Activo;
+            NcfPrefijo = secuencia.Prefijo;
+            NcfLargoTexto = secuencia.Largo.ToString(CulturaDo);
+            NcfProximaTexto = secuencia.Proxima.ToString(CulturaDo);
+            NcfFinTexto = secuencia.FinRango?.ToString(CulturaDo) ?? string.Empty;
+            NcfVencimiento = secuencia.Vencimiento?.ToDateTime(TimeOnly.MinValue);
+            ActualizarEstadoNcf(secuencia);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error cargando la secuencia NCF");
+            NcfEstadoTexto = "No se pudo cargar la configuración de comprobantes.";
+        }
+        finally
+        {
+            _cargandoNcf = false;
+        }
+    }
+
+    /// <summary>
+    /// Deja la sección en blanco cuando la clínica todavía NO cargó secuencia.
+    /// Los valores que quedan son de fábrica, a modo de ejemplo (B02 =
+    /// Consumidor Final, 8 dígitos, desde 1). No hay secuencia hasta que el
+    /// Admin guarde: mientras tanto el NCF se sigue escribiendo a mano.
+    /// </summary>
+    private void LimpiarNcf()
+    {
+        NcfActivo = false;
+        NcfPrefijo = "B02";
+        NcfLargoTexto = "8";
+        NcfProximaTexto = "1";
+        NcfFinTexto = string.Empty;
+        NcfVencimiento = null;
+        NcfEstadoTexto =
+            "La clínica todavía no cargó una secuencia: el NCF se escribe a mano en cada cobro. " +
+            "Los valores de arriba son un ejemplo (B02 = Consumidor Final); al marcar la casilla " +
+            "se borran para que escribas los que te autorizó la DGII.";
+    }
+
+    /// <summary>
+    /// Al ENCENDER la casilla se vacían los campos, para que nadie active la
+    /// numeración automática quedándose con los números de un talonario viejo
+    /// sin darse cuenta. Un prefijo escrito nunca vuelve por accidente: o se
+    /// escribe a mano, o entra por un comprobante realmente usado en un cobro.
+    /// </summary>
+    partial void OnNcfActivoChanged(bool value)
+    {
+        if (!value || _cargandoNcf)
+            return;
+
+        NcfPrefijo = string.Empty;
+        NcfLargoTexto = string.Empty;
+        NcfProximaTexto = string.Empty;
+        NcfFinTexto = string.Empty;
+        NcfVencimiento = null;
+
+        NcfEstadoTexto =
+            "Escribí la secuencia que le autorizó la DGII a la clínica: prefijo " +
+            "(B02 tradicional, E32 e-CF), largo (8 o 10 dígitos), en qué número " +
+            "arranca y hasta dónde llega el rango.";
+    }
+
+    private void ActualizarEstadoNcf(NcfSecuencia secuencia)
+    {
+        if (!secuencia.Activo)
+        {
+            NcfEstadoTexto = "Numeración automática apagada: el NCF se escribe a mano en cada cobro.";
+            return;
+        }
+
+        var hoy = FechaNegocio.Hoy;
+        if (secuencia.EstaVencida(hoy))
+        {
+            NcfEstadoTexto = $"⚠ La secuencia venció el {secuencia.Vencimiento:dd/MM/yyyy}. " +
+                             "Solicitá una nueva a la DGII: hasta entonces los cobros van a fallar.";
+            return;
+        }
+        if (secuencia.EstaAgotada)
+        {
+            NcfEstadoTexto = "⚠ La secuencia se agotó (fin del rango autorizado). " +
+                             "Solicitá una nueva a la DGII: hasta entonces los cobros van a fallar.";
+            return;
+        }
+
+        NcfEstadoTexto = $"Próximo comprobante: {secuencia.Formatear(secuencia.Proxima)}";
+        if (secuencia.Restantes is { } restantes)
+            NcfEstadoTexto += restantes <= 20
+                ? $" — ⚠ quedan solo {restantes}"
+                : $" — quedan {restantes}";
+        if (secuencia.Vencimiento is { } v)
+            NcfEstadoTexto += $" · vence {v:dd/MM/yyyy}";
+    }
+
+    [RelayCommand]
+    private async Task GuardarNcfAsync()
+    {
+        const string titulo = "Comprobante fiscal";
+        try
+        {
+            // Apagar la numeración es un camino propio: no exige que los campos
+            // tengan sentido, porque justamente se están dejando de usar.
+            if (!NcfActivo)
+            {
+                await _ncf.DesactivarAsync();
+                await CargarNcfAsync();
+                _dialogos.Informar(titulo,
+                    "Numeración automática apagada. El NCF vuelve a escribirse a mano en cada cobro.");
+                return;
+            }
+
+            if (!int.TryParse(NcfLargoTexto, NumberStyles.Integer, CulturaDo, out var largo))
+            {
+                _dialogos.MostrarError(titulo,
+                    "El largo de la secuencia debe ser un número (8 tradicional, 10 e-CF).");
+                return;
+            }
+            if (!long.TryParse(NcfProximaTexto, NumberStyles.Integer, CulturaDo, out var proxima))
+            {
+                _dialogos.MostrarError(titulo, "La próxima secuencia debe ser un número.");
+                return;
+            }
+            long? fin = null;
+            if (!string.IsNullOrWhiteSpace(NcfFinTexto))
+            {
+                if (!long.TryParse(NcfFinTexto, NumberStyles.Integer, CulturaDo, out var f))
+                {
+                    _dialogos.MostrarError(titulo, "El fin del rango debe ser un número (o quedar vacío).");
+                    return;
+                }
+                fin = f;
+            }
+
+            var secuencia = new NcfSecuencia
+            {
+                Prefijo = NcfPrefijo,
+                Largo = largo,
+                Proxima = proxima,
+                FinRango = fin,
+                Vencimiento = NcfVencimiento is { } v ? DateOnly.FromDateTime(v) : null,
+                Activo = true
+            };
+            await _ncf.GuardarSecuenciaAsync(secuencia);
+            ActualizarEstadoNcf(secuencia);
+            _dialogos.Informar(titulo,
+                $"Listo. Desde ahora, si dejás el NCF vacío al cobrar, la app asigna " +
+                $"{secuencia.Formatear(secuencia.Proxima)} y sigue de ahí.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException)
+        {
+            _dialogos.MostrarError(titulo, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error guardando la secuencia NCF");
+            _dialogos.MostrarError(titulo, $"No se pudo guardar.\n\n{ex.Message}");
+        }
     }
 
     // ------------------------------------------------------------------
@@ -455,7 +651,7 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
             await _respaldos.RestaurarAsync(rutaArchivo);
             await _config.CargarAsync();
             _dialogos.Informar("Restauración completada",
-                "Los datos fueron restaurados. Cierra y vuelve a abrir MED-100 " +
+                $"Los datos fueron restaurados. Cierra y vuelve a abrir {AppInfo.Nombre} " +
                 "para que todas las pantallas se actualicen.");
         }
         catch (Exception ex)
@@ -557,6 +753,23 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
     partial void OnGmailRemitenteChanged(string value) => GuardarAjustesCorreo();
     partial void OnCorreoDuenoChanged(string value) => GuardarAjustesCorreo();
 
+    // ---- Fiados en el aviso diario (012) ----
+    [ObservableProperty] private bool _avisoFiadosActivo = true;
+    [ObservableProperty] private string _avisoFiadosDiasTexto = "7";
+
+    partial void OnAvisoFiadosActivoChanged(bool value) => GuardarAjustesCorreo();
+
+    /// <summary>
+    /// Un texto que todavía no es un número no se guarda ni se corrige solo: si
+    /// escribiera un default mientras el usuario borra para reescribir, el
+    /// campo pelearía con los dedos. Se guarda cuando vuelve a ser válido.
+    /// </summary>
+    partial void OnAvisoFiadosDiasTextoChanged(string value)
+    {
+        if (int.TryParse(value, out var dias) && dias is >= 0 and <= 365)
+            GuardarAjustesCorreo();
+    }
+
     private void GuardarAjustesCorreo()
     {
         _ajustes.RecordatoriosActivos = RecordatoriosActivos;
@@ -568,6 +781,13 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
         // un cero: cero horas de anticipacion equivale a no avisar nunca.
         if (int.TryParse(RecordatorioCitasHorasTexto, out var horas) && horas > 0)
             _ajustes.RecordatorioCitasHorasAntes = Math.Clamp(horas, 1, 168);
+
+        // Fiados (012). Acá 0 SÍ es válido, al revés que las horas de la cita:
+        // significa "avisame solo de las que ya están atrasadas".
+        _ajustes.AvisoFiadosActivo = AvisoFiadosActivo;
+        if (int.TryParse(AvisoFiadosDiasTexto, out var diasFiado) && diasFiado >= 0)
+            _ajustes.AvisoFiadosDias = Math.Clamp(diasFiado, 0, 365);
+
         _ajustes.Guardar();
     }
 

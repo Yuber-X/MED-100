@@ -71,7 +71,8 @@ public class FlujoVentaTests : IAsyncLifetime
         await config.CargarAsync();
         _ventas = new VentaService(new FacturaRepository(factory),
             new ClienteRepository(factory), new MedicoRepository(factory),
-            new ArsRepository(factory), config, auditoria);
+            new ArsRepository(factory), config, auditoria,
+            new NcfService(new NcfRepository(factory), auditoria));
     }
 
     public Task DisposeAsync()

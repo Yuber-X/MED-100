@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using MED100.Common;
@@ -55,7 +55,7 @@ public partial class ActivacionWindow : Window
             Serilog.Log.Warning(ex, "No se pudo abrir WhatsApp");
             MessageBox.Show(
                 "No se pudo abrir WhatsApp desde acá.\n\nEscribí al " + Soporte.Telefono + ".",
-                "MED-100", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppInfo.Nombre, MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 }

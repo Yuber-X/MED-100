@@ -2,6 +2,177 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.0.0/). Fechas en hora de República Dominicana.
 
+## [1.2.0] — 2026-09-06
+
+Versión de nombre nuevo: **el producto pasa a llamarse MediControl**. Empaqueta
+las tres tandas de pedidos de agosto que nunca llegaron a un instalador, cierra
+cinco decisiones que el cliente tenía pendientes desde el 25 de agosto, y trae
+—por fin— un actualizador.
+
+### Added
+
+- **Actualizador propio (`MediControl_Update_1.2.0.exe`).** Era lo que faltaba
+  para poder mandar una corrección sin reinstalar todo. Pesa **61 MB contra los
+  282 del instalador completo**, porque no arrastra MySQL, AnyDesk ni Google
+  Drive. No pregunta carpeta, no toca la base de datos, y conserva la cadena de
+  conexión, la licencia, los ajustes de cada terminal y los expedientes
+  escaneados.
+
+  Lleva las tres defensas que salieron del incidente de FAControl del
+  2026-09-05, cuando una actualización dijo "listo" y la aplicación siguió
+  siendo la vieja:
+
+  1. **`AppMutex`** — si el programa está abierto, la instalación ni empieza.
+     La app crea `Global\MediControl.App.Instancia` al arrancar.
+  2. **`CloseApplications`** — si algún archivo quedó tomado, Windows lo detecta
+     por Restart Manager y ofrece cerrarlo, en vez de diferirlo al próximo
+     reinicio.
+  3. **Comprobación de versión al terminar** — lee la versión del `.exe` que
+     quedó en disco y la compara con la que traía. Si no coinciden lo dice con
+     todas las letras y manda a llamar al soporte.
+
+  Y si se ejecuta en una PC donde MediControl no está instalado, se niega a
+  correr: instalar "la actualización" sobre una máquina limpia dejaría la
+  aplicación sin MySQL, que es el fallo más caro de diagnosticar — parece un
+  problema del programa y en realidad falta la base de datos.
+
+- **La versión, visible en la pantalla de inicio.** Debajo del botón de entrar
+  dice "Versión 1.2.0". Es cómo el soporte confirma en diez segundos, con una
+  foto de la pantalla, si una actualización entró de verdad.
+
+- **Comprobante fiscal (NCF) con secuencia autorizada.** Portado de FAControl.
+  Hasta ahora el NCF se escribía a mano en cada cobro; eso sigue funcionando
+  igual y **manda sobre todo lo demás**. Lo nuevo es que en *Configuración →
+  Comprobante fiscal* se puede cargar el rango que autorizó la DGII (prefijo,
+  largo, próximo número, fin de rango y vencimiento), y entonces, al dejar la
+  caja del NCF vacía, la app asigna el siguiente sola.
+
+  La reserva es **atómica dentro de la transacción de la factura**: dos cajeros
+  cobrando a la vez no pueden recibir el mismo comprobante, y si el cobro falla
+  el número no se quema. Un NCF consumido no se reusa nunca, ni al anular: es
+  regla de la DGII.
+
+  Si se escribe uno a mano, la secuencia se corre sola para seguir a partir de
+  ese. Lo único que no hace es retroceder dentro de la misma serie — eso
+  volvería a entregar números ya consumidos.
+
+  Si la secuencia venció o se agotó, **el cobro falla con un mensaje claro** en
+  vez de emitir sin comprobante. Entregarle al paciente un papel inválido es
+  peor que detener el cobro treinta segundos.
+
+  La tabla nace VACÍA a propósito: sin autorización cargada, nada cambia
+  respecto de la 1.1.0. Inventar un rango B02 que la clínica no tiene autorizado
+  produciría comprobantes falsos.
+
+- **Fiados: facturas que quedan con saldo pendiente.** Pedido de Yuber
+  (*"parecido a los préstamos a punto de caducar, pero orientado a los fiados a
+  clientes"*).
+
+  Al cobrar aparece **"Queda debiendo"**: se anota cuánto entrega el paciente
+  hoy y para cuándo se compromete a pagar el resto. El saldo se recalcula
+  mientras se escribe, y va impreso en el ticket que se lleva el paciente — si
+  el único registro de la deuda quedara del lado de la clínica, discutirla
+  después sería la palabra de uno contra la del otro.
+
+  Pantalla **Fiados** nueva: quién debe, cuánto, desde cuándo, con semáforo (al
+  día / por vencer / vencido / en mora, los mismos umbrales que FAControl usa
+  para las cuotas). Desde ahí se cobran abonos y se mueve la fecha acordada.
+
+  La **fecha de pago es obligatoria** al fiar, y no es burocracia: es de donde
+  salen el semáforo y el aviso automático. Una deuda sin fecha no le aparece a
+  nadie nunca y se descubre meses después revisando papeles.
+
+  Permiso propio `fiados`, separado de `vender`: decidir a quién se le fía es
+  una decisión de crédito, y en una clínica chica no la toma todo el que cobra
+  en el mostrador. Consultar la lista sí es libre — recepción necesita saber
+  quién debe cuando el paciente llega.
+
+- **Las deudas entran al aviso automático por correo.** Van en el MISMO correo
+  diario que los productos por caducar, no en uno aparte: dos correos diarios
+  del mismo sistema se dejan de leer los dos. Las atrasadas salen siempre; las
+  por vencer, dentro de la ventana que se configure. Cada renglón lleva el
+  teléfono adelante, porque lo que se espera es llamar.
+
+- **Medicamentos indicados.** Pedido de Yuber (*"cuando el médico le indique los
+  medicamentos también puedan ser colocados acá para mejor organización e
+  historial de los procesos durante el día trabajado"*).
+
+  Pantalla nueva organizada **por día**, que es lo que se pidió: poder releer la
+  jornada. Se anota el paciente, el médico que lo indicó, y los medicamentos con
+  dosis, frecuencia, duración e instrucciones. Solo el nombre del medicamento es
+  obligatorio: en la vida real el médico dice "amoxicilina 500 cada 8 por 7
+  días", pero también dice "algo para el dolor", y exigir dosis haría que se
+  anote mal con tal de guardar.
+
+  ⚠ **Esto mueve el límite del alcance** (`CLAUDE.md` §1.1) y conviene verlo de
+  frente: un medicamento indicado **es** un dato de salud, y la Ley 172-13 lo
+  clasifica como sensible. Queda acotado así: se anota QUÉ se mandó a tomar,
+  nunca POR QUÉ — sigue sin haber un solo campo de diagnóstico, evolución ni
+  antecedente. Permiso propio `indicaciones` que gobierna **hasta la consulta**,
+  auditoría de toda alta y baja nombrando los medicamentos, soft delete, y dar
+  de baja es exclusivo del Admin.
+
+  Los días pasados se consultan pero no se cargan: una indicación se anota el
+  día que ocurre, y permitir cargar hacia atrás invitaría a acomodar el
+  historial.
+
+### Changed
+
+- **El producto se llama MediControl.** Yuber pidió el nombre y quedó elegido:
+  se entiende de un golpe en español, es inequívocamente médico y sigue la
+  familia de productos (PrestControl, DealerControl, AutoControl, FAControl).
+
+  **Solo cambia lo visible**: título de las ventanas, sidebar, instalador y
+  mensajes. Por debajo no se tocó nada de esto, y no es un descuido:
+
+  | Qué | Por qué no se toca |
+  |---|---|
+  | `AppId` del instalador | Windows lo vería como otra aplicación y el cliente terminaría con dos instaladas |
+  | `%ProgramData%\MED-100\licencia.dat` | Es el ancla de la licencia: moverla reiniciaría el demo de 15 días en cada equipo ya activado |
+  | Namespaces `MED100.*` y base `med100_db` | Caro de renombrar y no se ve |
+
+  O sea: **MED-100 es el nombre del proyecto, MediControl el del producto.** Lo
+  que se muestra sale siempre de `AppInfo.Nombre`.
+
+- **Paleta médica.** Los colores salen del logo que mandó la clínica el
+  2026-08-25: azul clínico `#0396D4`, cian `#29DAE2`, navy `#100062`. Reemplazan
+  al indigo heredado del POS-500. Resuelve la pregunta que el cliente nunca
+  contestó — azul-cian *es* como se lee "salud" en cualquier parte, y encima es
+  su propia marca.
+
+- **El cuadre de caja suma lo que de verdad entró.** Con los fiados, lo que
+  entra a la caja deja de ser el total de la factura: ahora suma
+  `abonado_inicial` y, aparte, los abonos de deudas viejas cobrados ese día. Lo
+  que quedó fiado se informa por separado, sin sumar, para que el cajero
+  entienda por qué facturó más de lo que tiene en la mano.
+
+  Sin ARS y sin fiar, los números son idénticos a los de la 1.1.0.
+
+### Notas de migración
+
+Al abrir la 1.2.0 sobre una base 1.1.x, la aplicación aplica sola las
+migraciones 011, 012 y 013 (`VerificadorBaseDatos`). No hay que abrir Workbench.
+
+Las facturas que ya existían se dan por **pagadas completas**
+(`abonado_inicial = paciente_paga`): hasta esta versión no se podía fiar, así
+que es exactamente lo que había pasado.
+
+Los rollbacks están en `scripts/db/011_rollback.sql`, `012_rollback.sql` y
+`013_rollback.sql`. Los tres avisan en su cabecera qué se pierde: el 012 borra
+los pagos parciales y el 013 borra contenido clínico que no está en ninguna otra
+parte.
+
+### Pendiente de confirmar con el cliente
+
+- **Las plantillas de receta y consentimiento informado** siguen sin llegar
+  (*"tengo que dártelo"*). Lo que se hizo es el REGISTRO de lo indicado, que es
+  lo que se pidió; imprimir una receta con el formato oficial de la clínica
+  necesita ese papel.
+- **El consentimiento firmado del paciente** para tratar datos de salud
+  (Ley 172-13). El sistema no lo suple.
+- **El e-CF de la Ley 32-23**, obligatorio desde el 15-nov-2026. Ver §1.4 del
+  `CLAUDE.md`.
+
 ## [No publicado] — Pedidos de la clínica del 2026-08-28
 
 ### Added

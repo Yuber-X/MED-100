@@ -183,6 +183,153 @@ public class VerificadorBaseDatos
              WHERE NOT EXISTS (SELECT 1 FROM usuario_permiso up
                                 WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
             """),
+
+        // 011 — sin esta tabla, la pantalla de Cobrar revienta al buscar el
+        // próximo comprobante. Nace VACÍA a propósito: sin autorización de la
+        // DGII cargada la app sigue pidiendo el NCF a mano, que es lo correcto.
+        new("crear la tabla ncf_secuencia", """
+            CREATE TABLE IF NOT EXISTS ncf_secuencia (
+              id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              prefijo     VARCHAR(5)  NOT NULL,
+              largo       TINYINT UNSIGNED NOT NULL DEFAULT 8,
+              proxima     BIGINT UNSIGNED NOT NULL DEFAULT 1,
+              fin_rango   BIGINT UNSIGNED NULL,
+              vencimiento DATE NULL,
+              activo      TINYINT(1) NOT NULL DEFAULT 1,
+              created_at  DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+              updated_at  DATETIME NULL,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_ncf_secuencia_prefijo (prefijo)
+            ) ENGINE=InnoDB;
+            """),
+
+        // 012 — fiados. El ALTER y el backfill van JUNTOS bajo la misma guarda:
+        // así el UPDATE corre exactamente una vez, la primera. Todo lo emitido
+        // antes de esta versión se cobró completo, porque fiar no existía.
+        new("agregar factura.abonado_inicial", """
+            ALTER TABLE factura
+              ADD COLUMN abonado_inicial DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER paciente_paga;
+            UPDATE factura SET abonado_inicial = paciente_paga;
+            """)
+            { SoloSiFaltaColumna = ("factura", "abonado_inicial") },
+
+        new("agregar factura.fecha_compromiso", """
+            ALTER TABLE factura ADD COLUMN fecha_compromiso DATE NULL AFTER abonado_inicial;
+            ALTER TABLE factura ADD INDEX ix_factura_compromiso (fecha_compromiso, estado);
+            """)
+            { SoloSiFaltaColumna = ("factura", "fecha_compromiso") },
+
+        new("crear la tabla factura_abono", """
+            CREATE TABLE IF NOT EXISTS factura_abono (
+              id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              factura_id  BIGINT UNSIGNED NOT NULL,
+              usuario_id  BIGINT UNSIGNED NOT NULL,
+              fecha_utc   DATETIME       NOT NULL,
+              monto       DECIMAL(15,2)  NOT NULL,
+              metodo_pago ENUM('efectivo','tarjeta','transferencia','mixto') NOT NULL,
+              notas       VARCHAR(250)   NULL,
+              created_at  DATETIME       NOT NULL DEFAULT (UTC_TIMESTAMP()),
+              PRIMARY KEY (id),
+              KEY ix_abono_factura (factura_id),
+              KEY ix_abono_fecha (fecha_utc, usuario_id),
+              CONSTRAINT fk_abono_factura FOREIGN KEY (factura_id)
+                REFERENCES factura (id) ON DELETE RESTRICT,
+              CONSTRAINT fk_abono_usuario FOREIGN KEY (usuario_id)
+                REFERENCES usuario (id) ON DELETE RESTRICT,
+              CONSTRAINT ck_abono_positivo CHECK (monto > 0)
+            ) ENGINE=InnoDB;
+            """),
+
+        // 012 — el permiso de fiar, para Admin y Supervisor. Mismo patrón que
+        // precio_editar: hay que alcanzar también a usuario_permiso, porque el
+        // trigger del alta copió los permisos y no vuelve a correr.
+        new("dar de alta el permiso fiados", """
+            INSERT INTO permiso (codigo, nombre, descripcion)
+            SELECT 'fiados', 'Fiar y cobrar deudas',
+                   'Dejar una factura con saldo pendiente y registrar abonos posteriores'
+            WHERE NOT EXISTS (SELECT 1 FROM permiso WHERE codigo = 'fiados');
+
+            INSERT INTO rol_permiso (rol_id, permiso_id)
+            SELECT r.id, p.id FROM rol r
+              JOIN permiso p ON p.codigo = 'fiados'
+             WHERE r.nombre IN ('Admin', 'Supervisor')
+               AND NOT EXISTS (SELECT 1 FROM rol_permiso rp
+                                WHERE rp.rol_id = r.id AND rp.permiso_id = p.id);
+
+            INSERT INTO usuario_permiso (usuario_id, permiso_id)
+            SELECT u.id, p.id FROM usuario u
+              JOIN rol_permiso rp ON rp.rol_id = u.rol_id
+              JOIN permiso p ON p.id = rp.permiso_id AND p.codigo = 'fiados'
+             WHERE NOT EXISTS (SELECT 1 FROM usuario_permiso up
+                                WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
+            """),
+
+        // 013 — medicamentos indicados. OJO: es contenido clínico y mueve el
+        // límite del alcance (CLAUDE.md §1.1). Ver la cabecera de
+        // scripts/db/013_indicaciones.sql antes de tocar nada de esto.
+        new("crear la tabla indicacion", """
+            CREATE TABLE IF NOT EXISTS indicacion (
+              id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              cliente_id  BIGINT UNSIGNED NOT NULL,
+              medico_id   BIGINT UNSIGNED NULL,
+              cita_id     BIGINT UNSIGNED NULL,
+              fecha_utc   DATETIME       NOT NULL,
+              usuario_id  BIGINT UNSIGNED NOT NULL,
+              notas       VARCHAR(500)   NULL,
+              created_at  DATETIME       NOT NULL DEFAULT (UTC_TIMESTAMP()),
+              updated_at  DATETIME       NULL,
+              deleted_at  DATETIME       NULL,
+              PRIMARY KEY (id),
+              KEY ix_indicacion_fecha (fecha_utc),
+              KEY ix_indicacion_cliente (cliente_id, fecha_utc),
+              KEY ix_indicacion_medico (medico_id, fecha_utc),
+              CONSTRAINT fk_indicacion_cliente FOREIGN KEY (cliente_id)
+                REFERENCES cliente (id) ON DELETE RESTRICT,
+              CONSTRAINT fk_indicacion_medico FOREIGN KEY (medico_id)
+                REFERENCES medico (id) ON DELETE RESTRICT,
+              CONSTRAINT fk_indicacion_cita FOREIGN KEY (cita_id)
+                REFERENCES cita (id) ON DELETE RESTRICT,
+              CONSTRAINT fk_indicacion_usuario FOREIGN KEY (usuario_id)
+                REFERENCES usuario (id) ON DELETE RESTRICT
+            ) ENGINE=InnoDB;
+            """),
+
+        new("crear la tabla indicacion_medicamento", """
+            CREATE TABLE IF NOT EXISTS indicacion_medicamento (
+              id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              indicacion_id BIGINT UNSIGNED NOT NULL,
+              medicamento   VARCHAR(150)   NOT NULL,
+              dosis         VARCHAR(80)    NULL,
+              frecuencia    VARCHAR(80)    NULL,
+              duracion      VARCHAR(80)    NULL,
+              instrucciones VARCHAR(250)   NULL,
+              PRIMARY KEY (id),
+              KEY ix_indicacion_medicamento (indicacion_id),
+              CONSTRAINT fk_medicamento_indicacion FOREIGN KEY (indicacion_id)
+                REFERENCES indicacion (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB;
+            """),
+
+        new("dar de alta el permiso indicaciones", """
+            INSERT INTO permiso (codigo, nombre, descripcion)
+            SELECT 'indicaciones', 'Medicamentos indicados',
+                   'Registrar y consultar los medicamentos que el médico indicó al paciente'
+            WHERE NOT EXISTS (SELECT 1 FROM permiso WHERE codigo = 'indicaciones');
+
+            INSERT INTO rol_permiso (rol_id, permiso_id)
+            SELECT r.id, p.id FROM rol r
+              JOIN permiso p ON p.codigo = 'indicaciones'
+             WHERE r.nombre IN ('Admin', 'Supervisor', 'Servicio')
+               AND NOT EXISTS (SELECT 1 FROM rol_permiso rp
+                                WHERE rp.rol_id = r.id AND rp.permiso_id = p.id);
+
+            INSERT INTO usuario_permiso (usuario_id, permiso_id)
+            SELECT u.id, p.id FROM usuario u
+              JOIN rol_permiso rp ON rp.rol_id = u.rol_id
+              JOIN permiso p ON p.id = rp.permiso_id AND p.codigo = 'indicaciones'
+             WHERE NOT EXISTS (SELECT 1 FROM usuario_permiso up
+                                WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
+            """),
     ];
 
     /// <summary>

@@ -1,3 +1,4 @@
+﻿using MED100.Common;
 ﻿using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -87,7 +88,7 @@ public static class ExportadorPdf
 
             using var pdf = new PdfDocument();
             pdf.Info.Title = titulo;
-            pdf.Info.Creator = "MED-100";
+            pdf.Info.Creator = AppInfo.Nombre;
 
             // DIU (96 por pulgada) → puntos (72 por pulgada). Un ticket de 302
             // DIU da 80mm, que es lo que salía antes; un cierre en Carta da su
