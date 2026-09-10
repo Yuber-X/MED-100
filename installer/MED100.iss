@@ -12,8 +12,8 @@
 ; =============================================================
 
 ; El nombre VISIBLE del producto (2026-09-06). "MED-100" era el provisional.
-#define AppNombre "MediControl"
-#define AppVersion "1.2.0"
+#define AppNombre "Odonto Unión"
+#define AppVersion "1.3.0"
 
 ; ⚠ LA CARPETA DE DATOS NO CAMBIA CON EL NOMBRE. Ahi vive licencia.dat, el
 ; ancla que recuerda desde cuando corre el demo de 15 dias. Si se renombrara,
@@ -34,7 +34,7 @@
 #define ExeAnyDesk "AnyDesk.exe"
 ; Es el instalador WEB de MySQL: pesa 2 MB y descarga lo demas al correr, asi
 ; que la PC del cliente necesita internet durante ESE paso.
-#define ExeMySql "mysql-installer-web-community-8.0.46.0.msi"
+#define ExeMySql "mysql-installer-community-8.0.46.0.msi"
 #define ExeDrive "GoogleDriveSetup.exe"
 
 ; FileExists se evalua al COMPILAR: por eso el .iss sirve con y sin los archivos
@@ -52,7 +52,7 @@ AppSupportPhone={#AppTelefono}
 DefaultDirName={autopf}\{#AppNombre}
 DefaultGroupName={#AppNombre}
 OutputDir=Output
-OutputBaseFilename=MediControl_Setup_{#AppVersion}
+OutputBaseFilename=OdontoUnion_Setup_{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible

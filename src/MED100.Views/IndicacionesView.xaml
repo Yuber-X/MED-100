@@ -10,7 +10,7 @@
       <StackPanel>
         <TextBlock Text="Medicamentos indicados" Style="{DynamicResource Texto.Titulo3}" />
         <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,8,0,0"
-                   Text="No tenés permiso para ver los medicamentos indicados. Es información de salud del paciente y por eso está restringida. Si necesitás acceso, pediselo a un administrador." />
+                   Text="No tienes permiso para ver los medicamentos indicados. Es información de salud del paciente y por eso está restringida. Si necesitas acceso, pídeselo a un administrador." />
       </StackPanel>
     </Border>
 

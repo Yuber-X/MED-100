@@ -2,6 +2,55 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.0.0/). Fechas en hora de República Dominicana.
 
+## [1.3.0] — 2026-09-10 · El producto se llama Odonto Unión
+
+La clínica mandó su nombre y su logo el 2026-09-07: *"ya te mando el nombre:
+Odonto unión"*. Yuber decidió que el producto pase a llamarse así, en vez de
+dejar MediControl como marca y el nombre de la clínica solo en Configuración.
+
+### Cambiado
+
+- **El nombre visible es Odonto Unión** en toda la aplicación: pantalla de
+  inicio, títulos, instalador, actualizador y manual. Sale de un solo lugar,
+  `MED100.Common.AppInfo.Nombre`.
+- Los instaladores pasan a llamarse `OdontoUnion_Setup_1.3.0.exe` y
+  `OdontoUnion_Update_1.3.0.exe`. **Sin tilde en el nombre del archivo**: un
+  `.exe` con acento que viaja por WhatsApp y se descomprime en otra PC es pedir
+  problemas.
+- El instalador ahora trae el **MySQL completo (566 MB)** en vez del web (3 MB).
+  El web necesita internet *durante* la instalación y en una clínica esa
+  conexión no siempre está; si falla a mitad, MySQL queda instalado a medias y
+  lo que ve el cliente es que "la aplicación no abre". Misma decisión que
+  POS-500 1.2.0. El Setup sube unos 560 MB y vale la pena.
+
+### Lo que NO cambió, a propósito
+
+Cuatro cosas siguen diciendo MED-100 o MediControl por debajo, y cada una
+rompería algo distinto si se tocara:
+
+- el `AppId` del instalador — Windows vería otra aplicación y quedarían dos
+  instaladas;
+- `%ProgramData%\MED-100\licencia.dat` — moverlo reiniciaría el demo de 15
+  días en cada equipo ya activado;
+- los namespaces `MED100.*` y la base `med100_db` — caro y no se ve;
+- **el mutex `Global\MediControl.App.Instancia`** — es el que mira el
+  actualizador para negarse a correr con el programa abierto. Si se renombra,
+  el actualizador nuevo busca un mutex que la versión ya instalada no crea, no
+  la detecta, y actualiza con la aplicación abierta: exactamente el fallo que
+  costó el fin de semana del 5 de septiembre en FAControl.
+
+### Corregido
+
+- Voseo en pantalla: 10 textos que le hablaban de *vos* al usuario
+  (Configuración, Citas, Turnos, Indicaciones, el diálogo de documentos y el
+  mensaje de permiso de expedientes).
+
+### Documentación
+
+- El manual pasa a llamarse Odonto Unión, deja de hablar de "la tiendita", y
+  gana las secciones de **Fiados** y **Medicamentos indicados** que la 1.2.0
+  había dejado sin documentar.
+
 ## [1.2.0] — 2026-09-06
 
 Versión de nombre nuevo: **el producto pasa a llamarse MediControl**. Empaqueta

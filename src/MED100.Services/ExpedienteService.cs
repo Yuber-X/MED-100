@@ -439,7 +439,7 @@ public class ExpedienteService
     {
         if (!SesionActual.TienePermiso("expedientes"))
             throw new UnauthorizedAccessException(
-                "No tenés permiso para ver los expedientes de los pacientes.");
+                "No tienes permiso para ver los expedientes de los pacientes.");
     }
 
     private static void ExigirAdmin(string accion)

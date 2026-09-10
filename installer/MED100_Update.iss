@@ -1,5 +1,5 @@
 ; =============================================================
-; MediControl — ACTUALIZADOR (Inno Setup 6)
+; Odonto Unión — ACTUALIZADOR (Inno Setup 6)
 ; Compilar:  ISCC.exe MED100_Update.iss
 ; Requiere:  ..\publish\ generado con:
 ;   dotnet publish src/MED100.App -c Release -r win-x64 --self-contained true -o publish
@@ -22,8 +22,8 @@
 ; columnas nuevas, nunca borra. Por eso el actualizador NO necesita la
 ; contraseña de MySQL.
 ;
-; SI MediControl NO ESTÁ INSTALADO, este .exe se niega a correr y manda a usar
-; MediControl_Setup_x.y.z.exe. Instalar "la actualización" sobre una PC limpia
+; SI Odonto Unión NO ESTÁ INSTALADO, este .exe se niega a correr y manda a usar
+; OdontoUnion_Setup_x.y.z.exe. Instalar "la actualización" sobre una PC limpia
 ; dejaría la aplicación sin MySQL, que es el error más caro de diagnosticar:
 ; parece un problema del programa y en realidad falta la base de datos.
 ;
@@ -36,8 +36,8 @@
 ; la comprobación de versión al final.
 ; =============================================================
 
-#define AppNombre "MediControl"
-#define AppVersion "1.2.0"
+#define AppNombre "Odonto Unión"
+#define AppVersion "1.3.0"
 #define AppEditor "Yuber Santana"
 #define AppExe "MED100.App.exe"
 #define AppTelefono "849-438-0242"
@@ -57,7 +57,7 @@ AppMutex={#AppMutexNombre}
 DefaultDirName={autopf}\{#AppNombre}
 DefaultGroupName={#AppNombre}
 OutputDir=Output
-OutputBaseFilename=MediControl_Update_{#AppVersion}
+OutputBaseFilename=OdontoUnion_Update_{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -137,7 +137,7 @@ Filename: "{app}\{#AppExe}"; Description: "Abrir {#AppNombre} ahora"; \
 [Code]
 
 { Clave de desinstalación que escribió el instalador original. Si no está, en
-  esta PC no hay MediControl y este .exe no es el que corresponde.
+  esta PC no hay Odonto Unión y este .exe no es el que corresponde.
 
   El GUID va LITERAL y tiene que coincidir con el AppId de arriba. No se usa el
   preprocesador acá por dos razones: el AppId de Inno lleva las llaves dobles
@@ -209,6 +209,6 @@ begin
     MsgBox('En este equipo no hay ninguna instalación de {#AppNombre}.' + #13#10 + #13#10 +
            'Este archivo es solo para ACTUALIZAR una instalación que ya funciona: ' +
            'no trae MySQL, que es la base de datos que {#AppNombre} necesita.' + #13#10 + #13#10 +
-           'Para instalar por primera vez use MediControl_Setup_{#AppVersion}.exe.',
+           'Para instalar por primera vez use OdontoUnion_Setup_{#AppVersion}.exe.',
            mbCriticalError, MB_OK);
 end;

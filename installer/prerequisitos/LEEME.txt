@@ -9,7 +9,7 @@ QUÉ HAY QUE DEJAR EN ESTA CARPETA
 
 Los archivos tienen que llamarse EXACTAMENTE así (el .iss los busca por nombre):
 
-  mysql-installer-web-community-8.0.46.0.msi   MySQL Server 8.0 (instalador WEB)
+  mysql-installer-community-8.0.46.0.msi       MySQL Server 8.0 (instalador COMPLETO)
   AnyDesk.exe                     AnyDesk para Windows
   GoogleDriveSetup.exe            Google Drive para escritorio
 
@@ -52,11 +52,19 @@ llevar los tres instaladores aparte, en la misma memoria.
 
 Esta carpeta está en .gitignore: los instaladores de terceros NO van al repositorio.
 
-OJO CON EL INSTALADOR **WEB** DE MYSQL
---------------------------------------
+EL INSTALADOR DE MYSQL ES EL COMPLETO (2026-09-10)
+--------------------------------------------------
 
-El que esta puesto (mysql-installer-web-community) pesa 2 MB porque descarga
-los componentes al ejecutarse: la PC del cliente necesita **internet durante la
-instalacion**. Si vas a instalar en un local sin conexion confiable, baja el
-instalador COMPLETO (el de ~450 MB, "mysql-installer-community-8.0.xx.msi"),
-dejalo en esta carpeta y cambiale el nombre en MED-100.iss (#define ExeMySql).
+Aca va el instalador COMPLETO (mysql-installer-community, 566 MB), no el WEB.
+
+El WEB pesa 3 MB pero descarga los componentes al ejecutarse: la PC del cliente
+necesita internet **durante la instalacion**, y en una clinica esa conexion no
+siempre esta. Si falla a mitad, MySQL queda instalado a medias y el sintoma que
+ve el cliente es que la aplicacion "no abre" — parece un fallo del programa y
+no lo es.
+
+El precio es el tamano del Setup, que sube unos 560 MB. Vale la pena: es la
+misma decision que se tomo en POS-500 1.2.0.
+
+Si alguna vez hiciera falta volver al WEB, hay que cambiar tambien el nombre en
+MED100.iss (#define ExeMySql).

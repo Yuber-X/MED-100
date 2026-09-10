@@ -1,4 +1,4 @@
-# Manual de MED-100
+# Manual de Odonto Unión
 
 > Guía del día a día, en lenguaje sencillo. No hace falta saber de computadoras.
 
@@ -6,7 +6,7 @@
 
 ## 1. Entrar al sistema
 
-Abre **MED-100** (el ícono de la tiendita) y escribe tu usuario y contraseña.
+Abre **Odonto Unión** y escribe tu usuario y contraseña.
 
 Cada empleado tiene su propia cuenta. Lo que ves en el menú de la izquierda depende de tu
 rol: un cajero ve menos opciones que el administrador, y eso es normal.
@@ -92,6 +92,52 @@ Las facturas anuladas aparecen aparte y **no suman** al total: así ves que el d
 
 ---
 
+## 6b. Fiados (lo que queda debiendo el paciente)
+
+Al cobrar puedes marcar **"Queda debiendo"**: el paciente paga una parte hoy y el
+resto después. Cuando lo haces, el sistema **te obliga a poner una fecha de
+compromiso** — el día en que quedó en pagar.
+
+En la pantalla **Fiados** ves toda la deuda con un semáforo, igual que el de los
+productos por vencer:
+
+- **Al día** — falta más de una semana para la fecha de compromiso
+- **Por vencer** — vence dentro de los próximos 7 días
+- **Vencido** — ya pasó la fecha
+- **En mora** — pasaron más de 15 días
+
+Desde ahí cobras los abonos y puedes correr la fecha de compromiso si el paciente
+lo pide.
+
+> ⚠️ **Lo importante para el cuadre:** el cuadre del día suma **lo que de verdad
+> entró en la caja**, no el total facturado. Lo fiado se informa aparte. Y cuando
+> el paciente viene a abonar, ese dinero entra en el cuadre **del día en que
+> paga**, no en el de la factura. Así un cierre ya firmado nunca cambia solo.
+
+Las deudas por vencer entran también en el **correo automático diario**, junto a
+los productos próximos a caducar.
+
+---
+
+## 6c. Medicamentos indicados
+
+Cuando el médico indica un medicamento, se anota aquí: **qué**, la dosis, cada
+cuánto, por cuántos días y las instrucciones. Solo el nombre del medicamento es
+obligatorio — a veces el médico dice "amoxicilina 500 cada 8" y a veces dice
+"algo para el dolor".
+
+Sirve para tener el historial de lo que se indicó durante el día trabajado.
+
+> 🔒 **Esto es información de salud del paciente.** La Ley 172-13 la trata como
+> dato sensible, así que la pantalla tiene su propio permiso —y ese permiso
+> gobierna hasta **mirar**, no solo escribir—; toda alta y baja queda en el
+> historial con nombre y apellido, y nada se borra de verdad.
+>
+> Se anota **qué** se indicó, nunca **por qué**: acá no van diagnósticos ni
+> antecedentes.
+
+---
+
 ## 7. Panel y Reportes
 
 - **Panel**: ventas de hoy, del mes (comparadas con el mes pasado), ticket promedio,
@@ -133,7 +179,7 @@ Aquí creas las cuentas de tus empleados:
 
 ### Licencia (los 15 días de prueba)
 
-MED-100 funciona **completo durante 15 días** desde que se instala, para que puedas
+Odonto Unión funciona **completo durante 15 días** desde que se instala, para que puedas
 probarlo con calma. Mientras dure, en el menú de la izquierda vas a ver un cartelito
 **DEMO · N días** con los días que quedan.
 
@@ -186,4 +232,4 @@ en Usuarios.
 No. Cada factura guarda el precio y el ITBIS con los que se emitió. El pasado no se toca.
 
 ---
-*MED-100 · desarrollado por Yuber Santana · soporte según contrato de mantenimiento.*
+*Odonto Unión · desarrollado por Yuber Santana · soporte según contrato de mantenimiento.*

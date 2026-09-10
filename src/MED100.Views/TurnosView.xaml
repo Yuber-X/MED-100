@@ -145,7 +145,7 @@
             <TextBlock TextWrapping="Wrap" Margin="2,4,0,0"
                        Style="{DynamicResource Texto.Caption}"
                        Foreground="{DynamicResource Brush.TextoTerciario}"
-                       Text="Si elegís médico, el número sale con su código (YO-7) y el turno queda en su lista." />
+                       Text="Si eliges médico, el número sale con su código (YO-7) y el turno queda en su lista." />
 
             <TextBlock Text="{Binding MensajeError}" TextWrapping="Wrap" Margin="0,10,0,0"
                        Foreground="{DynamicResource Brush.Destructivo}"

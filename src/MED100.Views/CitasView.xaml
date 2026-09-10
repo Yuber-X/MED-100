@@ -295,7 +295,7 @@
                                        Converter={StaticResource BoolAVisibilidad}}">
                 <TextBlock TextWrapping="Wrap" Style="{DynamicResource Texto.Caption}"
                            Foreground="{DynamicResource Brush.TextoTerciario}"
-                           Text="Esta cita ya terminó. Si la marcaste por error, podés volver atrás." />
+                           Text="Esta cita ya terminó. Si la marcaste por error, puedes volver atrás." />
                 <Button Content="Deshacer: volver a programada" Margin="0,8,0,0"
                         HorizontalAlignment="Stretch"
                         Style="{DynamicResource Boton.Secundario}"

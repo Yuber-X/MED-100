@@ -619,7 +619,7 @@ public partial class ConfiguracionViewModel : ObservableObject, IPaginaAsincrona
                 detalle += "\n\n(Todavía no hay expedientes de pacientes que respaldar.)";
 
             _dialogos.Informar("Respaldo completado",
-                detalle + "\n\nGuardá los dos archivos en un USB o la nube: con ellos podés " +
+                detalle + "\n\nGuarda los dos archivos en un USB o la nube: con ellos puedes " +
                 "restaurar todo el sistema en otro equipo.");
         }
         catch (Exception ex)

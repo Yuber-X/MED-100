@@ -28,7 +28,7 @@
 
       <Border Height="1" Background="{DynamicResource Brush.BordeSutil}" Margin="0,18,0,14" />
 
-      <TextBlock Text="¿Qué querés hacer con este documento?"
+      <TextBlock Text="¿Qué quieres hacer con este documento?"
                  Style="{DynamicResource Texto.Caption}" Margin="0,0,0,10" />
 
       <!-- Abrir y guardar: para cualquiera que tenga la pantalla.

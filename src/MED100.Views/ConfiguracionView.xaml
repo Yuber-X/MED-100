@@ -179,7 +179,7 @@
                 <TextBlock Text="Fin del rango (opcional)" Style="{DynamicResource Input.Label}" />
                 <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
                          Text="{Binding NcfFinTexto, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Último número autorizado. Dejalo vacío si no tenés tope; si lo cargás, la app avisa cuando queden pocos." />
+                         ToolTip="Último número autorizado. Déjalo vacío si no tienes tope; si lo cargas, la app avisa cuando queden pocos." />
               </StackPanel>
             </Grid>
 
@@ -425,7 +425,7 @@
             <Run Text="La 'Contraseña de aplicación' NO es tu contraseña de Gmail: es un código de 16 letras que genera Google (la cuenta debe tener la verificación en 2 pasos activada). Pasos: 1) abrí " />
             <Hyperlink NavigateUri="https://myaccount.google.com/apppasswords"
                        RequestNavigate="Hyperlink_RequestNavigate">myaccount.google.com/apppasswords</Hyperlink>
-            <Run Text="; 2) escribí un nombre (ej: MediControl) y tocá 'Crear'; 3) copiá las 16 letras y pegalas acá (los espacios se quitan solos)." />
+            <Run Text="; 2) escribe un nombre (ej: Odonto Unión) y toca 'Crear'; 3) copia las 16 letras y pégalas aquí (los espacios se quitan solos)." />
           </TextBlock>
 
           <CheckBox Content="Activar el aviso de caducidad por correo" FontSize="13"

@@ -46,11 +46,35 @@ Decisiones que Yuber cerró el 2026-09-06 y quedaron implementadas:
 - [ ] Instalar el 1.2.0 completo en una PC limpia siguiendo INSTALL.md
 
 ### Antes de entregarlo al cliente
-- [ ] Confirmarle el nombre **MediControl** antes de imprimir cualquier material
-- [ ] Cambiar el MySQL **web** (2 MB, necesita internet) de
-      `installer/prerequisitos/` por el **offline** de 593 MB, como en POS-500 v1.2.0
-- [ ] Actualizar `docs/MANUAL.md` con las pantallas nuevas (Fiados, Medicamentos)
-      y el nombre MediControl
+- [x] Nombre confirmado por la clinica el 2026-09-07: **Odonto Unión**
+- [x] MySQL **offline** (566 MB) puesto en `installer/prerequisitos/`, y el
+      `.iss` apuntando a el. El LEEME explica por que no se vuelve al web
+- [x] `docs/MANUAL.md` con el nombre nuevo y las secciones de Fiados y
+      Medicamentos indicados
+
+## Ronda del 2026-09-10 — el producto se llama Odonto Unión (1.3.0)
+
+- [x] `AppInfo.Nombre` -> Odonto Unión; version 1.3.0 en AppInfo, csproj y los dos .iss
+- [x] Instaladores renombrados a `OdontoUnion_Setup_` / `OdontoUnion_Update_`
+      (sin tilde en el nombre del archivo, a proposito)
+- [x] El MUTEX NO se renombro: es lo que mira el actualizador para negarse a
+      correr con la app abierta. Renombrarlo repetiria el fallo de FAControl
+      del 5-sep. Documentado en AppInfo y en el CHANGELOG
+- [x] 10 textos en voseo corregidos
+- [x] 343 tests en verde, verificador XAML OK
+
+### Pendiente de probar a mano
+- [ ] Abrir la app y confirmar que dice "Odonto Unión" y "Version 1.3.0" abajo
+- [ ] Correr `OdontoUnion_Update_1.3.0.exe` **con la app abierta**: tiene que
+      negarse. Es la prueba que valida que el mutex viejo sigue sirviendo
+- [ ] Instalar en una PC limpia y confirmar que MySQL entra **sin internet**
+
+### Lo que le sigue faltando al manual
+- [ ] **7 pantallas sin documentar.** El manual venia del POS y nunca se
+      adapto a la clinica: no menciona Medicos, Procedimientos, Citas, Turnos,
+      Expedientes ni Panel clinico. Fiados y Medicamentos ya se agregaron.
+      Es trabajo de redaccion, no de codigo; decidir con Yuber si entra antes
+      de imprimir el manual para la clinica
 
 ## Fase 1 — Cimientos (COMPLETA salvo prueba manual)
 - [x] Estructura de solución (MED100.sln + 8 proyectos src + 2 tests, clonada de PrestControl)
