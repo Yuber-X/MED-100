@@ -23,7 +23,119 @@ aplicación**. Cada venta queda registrada a nombre de quien la hizo.
 
 ---
 
-## 2. Vender (la pantalla del día a día)
+## 2. Sala de espera (los turnos)
+
+La puerta de la clínica. Aquí se entrega el número **sin registrar a nadie**: el
+turno se da primero, el paciente se registra después y la factura viene mucho
+después. Son tres momentos distintos y el sistema no los obliga a ocurrir juntos.
+
+- **Dar turno** — entrega el siguiente número. Puedes darlo en blanco (solo el
+  número) o elegir el médico.
+- **Si eliges médico**, el número sale con su código —por ejemplo **YO-7**— y el
+  turno queda en la lista de ese médico.
+- **Llamar al siguiente** toma el que lleva más tiempo esperando. También puedes
+  **llamar a uno puntual** si hace falta salirse del orden.
+- Al terminar, el turno se cierra como **Atendido** o **Ausente**.
+- **Asignar paciente** conecta un turno ya dado con la ficha del paciente, cuando
+  se registra más tarde.
+- **Reimprimir** vuelve a sacar el papelito si se perdió.
+
+Un turno pasa por: **Esperando → Llamado → Atendido** (o **Ausente**).
+
+---
+
+## 3. Citas (la agenda del día)
+
+La agenda trabaja **de día en día**: flechas para moverte y un botón **Hoy** para
+volver.
+
+Al crear una cita eliges paciente, médico, procedimiento y hora. **La pantalla te
+muestra solo los huecos libres**, calculados con el horario de ese médico y la
+duración de ese procedimiento — por eso vale la pena tener bien cargados los dos.
+
+Una cita pasa por estos estados:
+
+| Estado | Qué significa |
+|---|---|
+| **Programada** | Se anotó, todavía sin confirmar |
+| **Confirmada** | El paciente dijo que viene |
+| **Atendida** | Ya pasó por el médico |
+| **Cancelada** | No se va a dar |
+| **No asistió** | Tenía cita y no vino |
+
+Si te equivocas al cambiar el estado, **Deshacer** lo devuelve al anterior.
+
+- **Cobrar** lleva la cita a la pantalla de Cobrar con el paciente y el
+  procedimiento ya cargados.
+- **Enviar recordatorios** manda un correo **a cada paciente** con cita próxima.
+  Es distinto del correo de caducidad, que es uno solo para el dueño; por eso
+  tiene su propio interruptor en Configuración.
+
+> Cada cita se marca como "recordatorio enviado" **solo después** de que su
+> correo salió bien. Si la conexión se corta a mitad de la tanda, los que
+> quedaron sin aviso se los manda en el siguiente intento.
+
+Todas las horas son la hora de aquí. No hay que hacer ninguna cuenta.
+
+---
+
+## 4. Médicos
+
+La ficha de cada médico:
+
+- **Nombre y especialidad**
+- **Código de turno** — el prefijo con que salen sus números en la sala (YO, PA...)
+- **Porcentaje de honorario** — lo que le corresponde de lo que se cobra
+- **Horarios fijos** — los días y las horas en que atiende. Los días se marcan
+  todos juntos con casillas, y cada día puede tener su tramo.
+
+La lista dice, de un vistazo, **quién está atendiendo ahora mismo** y qué días
+atiende cada uno.
+
+> El porcentaje de honorario **queda guardado en la ficha**, y cada vez que se
+> cambia queda anotado en el historial. Todavía **no genera un reporte de
+> liquidación**: hoy sirve como dato de referencia.
+
+---
+
+## 5. Procedimientos (el tarifario)
+
+Lo que cobra la clínica, con su precio:
+
+- **Código** y **nombre**
+- **Precio**
+- **Duración** — es la que usa la agenda para calcular los huecos. Un
+  procedimiento con la duración mal puesta desordena la agenda entera.
+- **ITBIS: exento o gravado** — importante para la declaración. Muchos servicios
+  de salud son exentos; se marca uno por uno.
+- **Activo / Inactivo** — el que deja de ofrecerse se desactiva, no se borra, para
+  que las facturas viejas sigan cuadrando.
+
+Desde el tarifario puedes **agendar directo**, sin pasar por la pantalla de Citas.
+
+---
+
+## 6. Expedientes
+
+El archivo de papeles de cada paciente: radiografías, consentimientos, resultados,
+lo que haga falta. Contesta la pregunta con la que nació el módulo: **"volvió este
+paciente — ¿qué tenemos ya de él?"**.
+
+La lista muestra a **todos** los pacientes con cuántos documentos tiene cada uno.
+
+> El filtro "solo los que tienen documentos" viene **apagado a propósito**. Los
+> que importan casi siempre son los que **no** tienen nada: a esos hay que
+> pedirles los papeles.
+
+Se entra al expediente del paciente y desde ahí se suben, se ven y se imprimen
+los documentos.
+
+> 🔒 Los expedientes tienen **su propio permiso**, y ese permiso gobierna hasta
+> **mirarlos**. Es información de salud del paciente.
+
+---
+
+## 7. Cobrar (la pantalla del día a día)
 
 1. **Escanea el código de barras** del producto con la pistola. Se agrega solo al carrito
    y la caja de búsqueda se limpia para el siguiente.
@@ -41,7 +153,7 @@ aplicación**. Cada venta queda registrada a nombre de quien la hizo.
 
 ---
 
-## 3. Productos, Almacén y Caducidad
+## 8. Productos, Almacén y Caducidad
 
 - **Productos**: dar de alta, editar precios y stock, poner fecha de caducidad.
   Los filtros de arriba te muestran rápido lo que tiene *stock bajo* o *está por caducar*.
@@ -54,14 +166,14 @@ aplicación**. Cada venta queda registrada a nombre de quien la hizo.
 
 ---
 
-## 4. Clientes
+## 9. Pacientes
 
 Lista, alta y edición. La **cédula es opcional**: en un colmado la mayoría de la gente no
 se registra, y está bien.
 
 ---
 
-## 5. Comprobantes (buscar una factura vieja)
+## 10. Comprobantes (buscar una factura vieja)
 
 Busca por **número de factura** o por **nombre del cliente**, y filtra por fechas.
 
@@ -74,7 +186,7 @@ Busca por **número de factura** o por **nombre del cliente**, y filtra por fech
 
 ---
 
-## 6. Cuadre de caja (cerrar el día)
+## 11. Cuadre de caja (cerrar el día)
 
 Por defecto ves el **cuadre general**: cuánto vendió cada cajero y el total del negocio,
 separado por efectivo, tarjeta y transferencia. También ves **cuánto tiempo estuvo activo**
@@ -92,7 +204,7 @@ Las facturas anuladas aparecen aparte y **no suman** al total: así ves que el d
 
 ---
 
-## 6b. Fiados (lo que queda debiendo el paciente)
+## 12. Fiados (lo que queda debiendo el paciente)
 
 Al cobrar puedes marcar **"Queda debiendo"**: el paciente paga una parte hoy y el
 resto después. Cuando lo haces, el sistema **te obliga a poner una fecha de
@@ -119,7 +231,7 @@ los productos próximos a caducar.
 
 ---
 
-## 6c. Medicamentos indicados
+## 13. Medicamentos indicados
 
 Cuando el médico indica un medicamento, se anota aquí: **qué**, la dosis, cada
 cuánto, por cuántos días y las instrucciones. Solo el nombre del medicamento es
@@ -138,7 +250,7 @@ Sirve para tener el historial de lo que se indicó durante el día trabajado.
 
 ---
 
-## 7. Panel y Reportes
+## 14. Panel y Reportes
 
 - **Panel**: ventas de hoy, del mes (comparadas con el mes pasado), ticket promedio,
   alertas de inventario, gráfico de ventas por día y quién vendió más.
@@ -148,7 +260,7 @@ Sirve para tener el historial de lo que se indicó durante el día trabajado.
 
 ---
 
-## 8. Usuarios (solo el Administrador)
+## 15. Usuarios (solo el Administrador)
 
 Aquí creas las cuentas de tus empleados:
 
@@ -165,13 +277,13 @@ Aquí creas las cuentas de tus empleados:
 
 ---
 
-## 9. Configuración (solo el Administrador)
+## 16. Configuración (solo el Administrador)
 
 - **Licencia**: dice si esta copia es de prueba o ya está activada → ver abajo.
 - **Apariencia**: tamaño del texto (si te cuesta leer, ponlo en Grande).
 - **Datos del negocio**: nombre, RNC (opcional), dirección, teléfono → salen en cada factura.
 - **Cálculos e impuestos**: el ITBIS (18%) se puede **desactivar** si tu negocio no lo cobra.
-- **Ventas**: mostrar u ocultar el cliente en la pantalla de Vender.
+- **Ventas**: mostrar u ocultar el paciente en la pantalla de Cobrar.
 - **Impresión**: vista previa antes de imprimir (por defecto imprime directo), copias y el
   mensaje del pie del ticket.
 - **Cierre de caja automático**: la hora a la que se cierra la caja sola.
@@ -199,7 +311,7 @@ de **WhatsApp** para pedirla.
 
 ---
 
-## 10. ⭐ Lo más importante: RESPALDAR
+## 17. ⭐ Lo más importante: RESPALDAR
 
 **Configuración → Respaldar ahora.** Guarda ese archivo `.sql` en un **USB o en la nube**.
 
@@ -213,7 +325,7 @@ la computadora se daña o si cambias de equipo.
 
 ---
 
-## 11. Preguntas frecuentes
+## 18. Preguntas frecuentes
 
 **¿Puedo vender sin cliente?**
 Sí. Es lo normal en un colmado o farmacia: sale como "Consumidor final".

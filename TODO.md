@@ -69,12 +69,15 @@ Decisiones que Yuber cerró el 2026-09-06 y quedaron implementadas:
       negarse. Es la prueba que valida que el mutex viejo sigue sirviendo
 - [ ] Instalar en una PC limpia y confirmar que MySQL entra **sin internet**
 
-### Lo que le sigue faltando al manual
-- [ ] **7 pantallas sin documentar.** El manual venia del POS y nunca se
-      adapto a la clinica: no menciona Medicos, Procedimientos, Citas, Turnos,
-      Expedientes ni Panel clinico. Fiados y Medicamentos ya se agregaron.
-      Es trabajo de redaccion, no de codigo; decidir con Yuber si entra antes
-      de imprimir el manual para la clinica
+### El manual (2026-09-10)
+- [x] Las 5 pantallas clinicas que faltaban: Sala de espera, Citas, Medicos,
+      Procedimientos y Expedientes. (Eran 5, no 7: el Panel que ya estaba
+      documentado SI es el del POS, asi que estaba bien)
+- [x] Reordenado con la clinica primero y renumerado: 18 secciones
+- [x] Rotulos alineados con la app: "Vender" -> Cobrar, "Clientes" -> Pacientes
+- [ ] El **.docx** que se le entrega al cliente quedo atrasado respecto al .md.
+      Regenerarlo antes de imprimirlo
+- [ ] Faltan las capturas de pantalla de las 5 secciones nuevas
 
 ## Fase 1 — Cimientos (COMPLETA salvo prueba manual)
 - [x] Estructura de solución (MED100.sln + 8 proyectos src + 2 tests, clonada de PrestControl)
