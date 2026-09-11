@@ -24,13 +24,29 @@
 
 ## 3. Paleta de colores
 
-### Marca principal (Indigo)
-| Rol | Hex | Uso |
-|---|---|---|
-| Indigo 600 | `#4F46E5` | Color principal, botones primarios, links, énfasis |
-| Indigo 700 | `#312B94` | Hover de botones primarios, títulos de sección |
-| Indigo 100 | `#E0E4FD` | Fondos suaves, badges informativos |
-| Indigo 50  | `#EEF0FE` | Fondos muy sutiles, sidebars |
+### Marca principal (azul de Odonto Unión)
+
+Desde la 1.2.0 la marca es la de la clínica, no el indigo heredado del POS-500.
+Los valores están **verificados contra el logo** (2026-09-11): el `.ai` es un PDF
+por dentro, se descomprimieron sus flujos de contenido y se contaron los
+rellenos reales del dibujo.
+
+| Rol | Hex | Uso | De dónde sale |
+|---|---|---|---|
+| Indigo 600 | `#0396D4` | Color principal, botones primarios, links, énfasis | el relleno dominante del logo (23 usos) |
+| Indigo 700 | `#0076D1` | Hover de botones primarios, títulos de sección | el azul oscuro de sus degradados |
+| Indigo 100 | `#BFE7F7` | Fondos suaves, badges informativos | el tinte claro de sus degradados |
+| Indigo 50  | `#EEF0FE` | Fondos muy sutiles, sidebars | calculado: el logo no tiene un tono tan claro |
+
+| Acento | `#29DAE2` | Realces puntuales | el cian del logo (4 usos) |
+| Navy | `#100062` | Realces puntuales | el navy del logo (2 usos) |
+
+> Las claves XAML siguen llamándose `Indigo*`: están referenciadas por nombre en
+> decenas de vistas y renombrarlas no cambiaría un solo píxel. Lo que manda es
+> el valor.
+
+> ⚠️ El acento y el navy **no se usan como fondo de texto chico**: el cian sobre
+> blanco no llega a contraste AA.
 
 ### Semántica financiera (semáforo de cobros)
 Este es el sistema visual más importante de la aplicación. Cada estado de cuota tiene su color asignado:

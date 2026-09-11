@@ -2,17 +2,35 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!-- Marca principal (azul clínico) — DESIGN.md §3
-       Sale del logo que mandó la clínica (2026-08-25): #0396D4 primario,
-       #29DAE2 acento, #100062 navy. Reemplaza al indigo heredado del POS-500.
-       El azul-cian es además el color con el que se lee "salud" en cualquier
-       parte, así que la marca del cliente y la convención del rubro coinciden.
+       VERIFICADA CONTRA EL LOGO (2026-09-11). El .ai que mandó la clínica es un
+       PDF por dentro; se descomprimieron sus flujos de contenido y se contaron
+       los rellenos reales del dibujo:
+
+         #0396D4 x23   el azul dominante      -> Indigo600
+         #29DAE2 x4    el cian de acento      -> Brush.Acento
+         #100062 x2    el navy                -> Brush.Navy
+         #06D2D9 x2    cian intermedio
+         y degradados #0396D4->#06D2D9, #0076D1->#06D2D9, #BFE7F7->blanco
+
+       Los tres primeros ya estaban bien desde la 1.2.0. Los DERIVADOS no: el
+       tono oscuro y el claro los había calculado yo aclarando y oscureciendo el
+       primario, y el logo trae los suyos. Ahora se usan los del logo:
+
+         Indigo700  #0277A9 -> #0076D1   (el azul oscuro de los degradados)
+         Indigo100  #CCE9F7 -> #BFE7F7   (el tinte claro de los degradados)
+
+       El #0076D1 además es MÁS oscuro que el primario, así que el texto blanco
+       encima contrasta mejor que antes, no peor.
+
+       Indigo50 se mantiene calculado: es un lavado de fondo casi blanco y el
+       logo no tiene ningún tono a esa altura del que copiarlo.
 
        Las claves siguen llamándose Indigo* a propósito: están referenciadas por
        nombre en todas las vistas, y renombrarlas obligaría a tocar decenas de
        XAML sin que se vea un solo píxel distinto. Lo que manda es el valor. -->
   <Color x:Key="Color.Indigo600">#0396D4</Color>
-  <Color x:Key="Color.Indigo700">#0277A9</Color>
-  <Color x:Key="Color.Indigo100">#CCE9F7</Color>
+  <Color x:Key="Color.Indigo700">#0076D1</Color>
+  <Color x:Key="Color.Indigo100">#BFE7F7</Color>
   <Color x:Key="Color.Indigo50">#EBF6FD</Color>
 
   <SolidColorBrush x:Key="Brush.Primario" Color="{StaticResource Color.Indigo600}" />
