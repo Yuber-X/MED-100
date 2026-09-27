@@ -38,6 +38,10 @@ public class FacturacionClinicaTests : IAsyncLifetime
             await Ejecutar(conexion, "DROP DATABASE IF EXISTS med100_facturacion_test;");
         }
         await new VerificadorBaseDatos(CadenaTest).CrearEsquemaAsync();
+        // Una instalacion real tambien corre los parches de apertura al abrir
+        // (ncf_secuencia, licencia, columnas nuevas). Sin esto la base de prueba
+        // nace a medias y fallan pruebas que no tienen nada que ver.
+        await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
 
         _factory = new ConexionFactory(CadenaTest);
         var auditoria = new AuditoriaService(new AuditoriaRepository(_factory));
@@ -449,13 +453,13 @@ public class FacturacionClinicaTests : IAsyncLifetime
     public async Task Rebaja_SeCobraElPrecioRebajado()
     {
         var r = await _ventas.RegistrarVentaAsync(
-            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
 
-        r.Totales.Total.Should().Be(1200m);
-        r.Totales.Descuento.Should().Be(300m);
+        r.Totales.Total.Should().Be(1350m);
+        r.Totales.Descuento.Should().Be(150m, "el tope es el 10% de 1,500");
 
         var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
-        leida!.Totales.Total.Should().Be(1200m, "la factura guarda lo que se cobró");
+        leida!.Totales.Total.Should().Be(1350m, "la factura guarda lo que se cobró");
     }
 
     /// <summary>
@@ -468,12 +472,12 @@ public class FacturacionClinicaTests : IAsyncLifetime
     public async Task Rebaja_LaReimpresionSigueMostrandoElDescuento()
     {
         var r = await _ventas.RegistrarVentaAsync(
-            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
 
         var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
         var copia = FacturaService.AVentaResultado(leida!);
 
-        copia.Totales.Descuento.Should().Be(300m);
+        copia.Totales.Descuento.Should().Be(150m);
         copia.Totales.SubtotalSinRebaja.Should().Be(1500m);
         copia.Totales.HuboRebaja.Should().BeTrue();
     }
@@ -487,7 +491,7 @@ public class FacturacionClinicaTests : IAsyncLifetime
     public async Task Rebaja_SubirElTarifarioNoAgrandaElDescuentoDeUnaFacturaVieja()
     {
         var r = await _ventas.RegistrarVentaAsync(
-            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
 
         await using (var conexion = new MySqlConnection(CadenaTest))
         {
@@ -497,7 +501,7 @@ public class FacturacionClinicaTests : IAsyncLifetime
         }
 
         var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
-        FacturaService.AVentaResultado(leida!).Totales.Descuento.Should().Be(300m);
+        FacturaService.AVentaResultado(leida!).Totales.Descuento.Should().Be(150m);
     }
 
     [Fact]
@@ -520,12 +524,12 @@ public class FacturacionClinicaTests : IAsyncLifetime
     public async Task Rebaja_ElItbisPersistidoSaleDelPrecioQueSeCobro()
     {
         var r = await _ventas.RegistrarVentaAsync(
-            Cobro([GasaRebajada(cobrado: 80m)], null));
+            Cobro([GasaRebajada(cobrado: 90m)], null));
 
         var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
 
-        leida!.Totales.Itbis.Should().Be(14.40m, "18% de 80, no de 100");
-        leida.Totales.Total.Should().Be(94.40m);
+        leida!.Totales.Itbis.Should().Be(16.20m, "18% de 90, no de 100");
+        leida.Totales.Total.Should().Be(106.20m);
     }
 
     /// <summary>
@@ -537,12 +541,36 @@ public class FacturacionClinicaTests : IAsyncLifetime
     public async Task Rebaja_ElHonorarioGuardadoSaleDeLoQueSeCobro()
     {
         var r = await _ventas.RegistrarVentaAsync(
-            Cobro([ConsultaRebajada(cobrado: 1000m)], _medicoId));
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
 
         var leida = await _facturas.ObtenerCompletaAsync(r.FacturaId);
 
-        leida!.Honorario!.Monto.Should().Be(400m, "40% de 1,000 y no de 1,500");
+        leida!.Honorario!.Monto.Should().Be(540m, "40% de 1,350 y no de 1,500");
     }
+
+    /// <summary>
+    /// El tope de la rebaja (pedido de la clínica, 2026-09-21): hasta 10%. Por
+    /// encima no se cobra: se cambia el precio del tarifario.
+    /// </summary>
+    [Fact]
+    public async Task Rebaja_MasDelDiezPorCiento_SeNiegaElCobro()
+    {
+        var accion = async () => await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1349m)], _medicoId));
+
+        await accion.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*no puede pasar del*");
+    }
+
+    [Fact]
+    public async Task Rebaja_JustoElDiezPorCiento_Pasa()
+    {
+        var r = await _ventas.RegistrarVentaAsync(
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
+
+        r.Totales.Descuento.Should().Be(150m);
+    }
+
 
     /// <summary>
     /// La pantalla ya deja la columna de solo lectura sin el permiso, pero eso
@@ -557,7 +585,7 @@ public class FacturacionClinicaTests : IAsyncLifetime
             ["vender"], DateTime.UtcNow, 1);
 
         var accion = async () => await _ventas.RegistrarVentaAsync(
-            Cobro([ConsultaRebajada(cobrado: 1200m)], _medicoId));
+            Cobro([ConsultaRebajada(cobrado: 1350m)], _medicoId));
 
         await accion.Should().ThrowAsync<ArgumentException>()
             .WithMessage("*permiso para rebajar precios*");

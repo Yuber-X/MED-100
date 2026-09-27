@@ -311,6 +311,22 @@ public class VentaService
                 "o que un supervisor autorice la rebaja.");
         }
 
+        // TOPE DE LA REBAJA (pedido de la clínica, 2026-09-21): hasta un 10%.
+        // Va acá y no solo en la pantalla porque el cobro entra también desde
+        // la ficha del paciente y desde la agenda.
+        foreach (var linea in solicitud.Lineas)
+        {
+            if (linea.PrecioCatalogo is not { } lista || linea.Descuento <= 0m)
+                continue;
+            var maximo = CalculosClinica.DescuentoMaximo(lista, linea.Cantidad);
+            if (linea.Descuento > maximo)
+                throw new ArgumentException(
+                    $"«{linea.NombreProducto}»: la rebaja no puede pasar del " +
+                    $"{CalculosClinica.TopeDescuento:P0} ({maximo:N2} sobre {lista * linea.Cantidad:N2}). " +
+                    "Si hay que cobrar menos, se cambia el precio en el tarifario.");
+        }
+
+
         // Cada línea es un procedimiento O un insumo, nunca las dos ni ninguna
         // (lo mismo que exige ck_detalle_una_cosa; se atrapa acá para dar un
         // mensaje entendible en vez de un error de restricción de MySQL).
@@ -326,7 +342,8 @@ public class VentaService
         // Un servicio de salud lo presta alguien: sin médico no hay de dónde
         // salga el honorario ni qué imprimir en la factura del paciente.
         if (solicitud.Lineas.Any(l => l.EsProcedimiento) && solicitud.MedicoId is null)
-            throw new ArgumentException("Elegí el médico: la factura tiene procedimientos.");
+            throw new ArgumentException("Elegí el médico que hizo el procedimiento: sin doctor asignado no se puede cobrar, " +
+                "porque de ahí salen su honorario y los reportes por médico.");
 
         if (solicitud.ArsCubierto > 0m && solicitud.ArsId is null)
             throw new ArgumentException("Elegí la ARS antes de indicar lo que cubre.");

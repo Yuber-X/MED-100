@@ -97,28 +97,81 @@
 
     <!-- ===== Lista ===== -->
     <Border Grid.Row="2" Grid.Column="0" Style="{DynamicResource Card}" Padding="0">
-      <DataGrid ItemsSource="{Binding Fiados}"
-                SelectedItem="{Binding Seleccionada}"
-                AutoGenerateColumns="False" IsReadOnly="True"
-                HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                CanUserResizeRows="False" SelectionMode="Single">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="Paciente" Binding="{Binding ClienteNombre}" Width="*" />
-          <DataGridTextColumn Header="Teléfono" Binding="{Binding Telefono}" Width="120" />
-          <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}" Width="110" />
-          <DataGridTextColumn Header="Debe" Binding="{Binding SaldoTexto}" Width="100" />
-          <DataGridTemplateColumn Header="Vencimiento" Width="170">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Border Style="{StaticResource Pastilla.Fiado}" Margin="0,4">
-                  <TextBlock Text="{Binding Vencimiento}"
-                             Style="{StaticResource Pastilla.Fiado.Texto}" />
-                </Border>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-        </DataGrid.Columns>
-      </DataGrid>
+      <Grid>
+        <!-- Style="Tabla": esta grilla era la única que había quedado con el
+             look por defecto de WPF —fondo gris, líneas y encabezados de
+             sistema— y desentonaba con el resto (pedido 2026-09-26). El estilo
+             de la casa trae filas de 44, sin líneas, resaltado al pasar y la
+             selección en el azul del producto. -->
+        <DataGrid Style="{DynamicResource Tabla}" RowHeight="58"
+                  ItemsSource="{Binding Fiados}"
+                  SelectedItem="{Binding Seleccionada}">
+          <DataGrid.Columns>
+            <!-- Nombre y teléfono en la MISMA columna, uno debajo del otro: son
+                 los dos datos de la misma persona y a quien cobra le sirven
+                 juntos. De paso la columna del nombre deja de recortar
+                 "María Altagracia Pére…" para que entre una columna de
+                 teléfonos medio vacía. -->
+            <DataGridTemplateColumn Header="Paciente" Width="*" MinWidth="220"
+                                    HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ClienteNombre}" FontSize="13"
+                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Brush.TextoPrincipal}" />
+                    <TextBlock Text="{Binding Telefono}" FontSize="11.5" Margin="0,2,0,0"
+                               Foreground="{DynamicResource Brush.TextoTerciario}" />
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Factura" Binding="{Binding NumeroFactura}"
+                                Width="Auto" MinWidth="100">
+              <DataGridTextColumn.ElementStyle>
+                <!-- Monoespaciada como en Comprobantes: los números de factura
+                     se comparan de un vistazo, uno debajo del otro. -->
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Tabla.Texto.Centrado}">
+                  <Setter Property="FontFamily" Value="{DynamicResource Fuente.Mono}" />
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTextColumn Header="Debe" Binding="{Binding SaldoTexto}"
+                                Width="Auto" MinWidth="100">
+              <DataGridTextColumn.ElementStyle>
+                <!-- Alineado a la derecha y con cifras tabulares: es plata. -->
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Texto.Monto}">
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTemplateColumn Header="Vencimiento" Width="Auto" MinWidth="170">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource Pastilla.Fiado}" Margin="0,4"
+                          HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding Vencimiento}"
+                               Style="{StaticResource Pastilla.Fiado.Texto}" />
+                  </Border>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Vacío no es lo mismo que "se rompió": una tabla en blanco sin una
+             palabra deja al usuario esperando algo que no va a llegar. -->
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
+                    Visibility="{Binding HayFiados, Converter={StaticResource InversorBoolVisibilidad}}">
+          <TextBlock Text="No hay nada fiado" HorizontalAlignment="Center"
+                     Style="{DynamicResource Texto.Titulo3}"
+                     Foreground="{DynamicResource Brush.TextoSecundario}" />
+          <TextBlock Style="{DynamicResource Texto.Caption}" Margin="0,6,0,0"
+                     TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"
+                     Foreground="{DynamicResource Brush.TextoTerciario}"
+                     Text="Cuando cobres una factura dejando saldo pendiente, el paciente aparece acá con su semáforo de vencimiento." />
+        </StackPanel>
+      </Grid>
     </Border>
 
     <!-- ===== Cobrar ===== -->

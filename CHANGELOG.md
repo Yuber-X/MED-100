@@ -2,6 +2,117 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.0.0/). Fechas en hora de República Dominicana.
 
+## [1.4.0] — 2026-09-25 · Los pedidos de la clínica del 21 de septiembre
+
+La clínica mandó su propuesta de modificaciones (`PROPUESTA DE MODIFICAICON
+SISTEMA.docx`, 21/09/2026). Esta versión la implementa completa, salvo un punto
+que quedó esperando una aclaración (ver *Pendiente*).
+
+### Agregado
+
+- **Categoría en el tarifario.** `procedimiento.categoria` (migración 014), con
+  su columna en la lista y un desplegable editable que propone las categorías ya
+  usadas. Se busca también por categoría.
+- **Cobrar desde la ficha del paciente.** Botón "Cobrar procedimiento": lleva a
+  la caja con el paciente puesto. No se armó un cobro aparte en la ficha a
+  propósito — la rebaja con su tope, el candado del médico, la ARS, el fiado y
+  el comprobante fiscal viven en Cobrar, y duplicarlos sería duplicar las
+  reglas.
+- **Tope de rebaja del 10%.** El descuento por línea no puede pasar del 10% del
+  precio de catálogo (`CalculosClinica.TopeDescuento`). La pantalla lo avisa
+  mientras se escribe y el cobro se niega si se pasa.
+- **Buscador de pacientes en Citas.** La lista completa, con búsqueda por
+  nombre, cédula o teléfono: el combo mostraba solo los primeros y con la
+  cartera llena no alcanzaba.
+- **Recordatorio manual de UNA cita**, además de la tanda automática del día.
+- **Medicamentos más usados.** La lista sale del historial de la propia clínica
+  —no de un catálogo que alguien tenga que mantener— y al elegir uno propone la
+  dosis y la frecuencia de la última vez.
+- **Corregir los medicamentos de una indicación ya guardada**: quitar uno solo,
+  arreglar una dosis o agregar el que faltó. Lo del día lo corrige quien lo
+  cargó; lo de días anteriores, solo el Admin. La auditoría guarda el antes y el
+  después, con los nombres.
+- **Receta timbrada.** Hoja carta con el membrete y el logo de la clínica, los
+  medicamentos con su dosis, el nombre del médico con su exequátur y la línea de
+  la firma **en blanco**. La firma no se digitaliza: estamparla sola convertiría
+  cualquier PC de la recepción en una fábrica de recetas firmadas.
+- **Consentimiento informado** (migración 015). Catálogo de textos por
+  procedimiento —o generales— que la clínica escribe desde Procedimientos, y que
+  se imprimen desde la ficha del paciente con sus datos y las dos firmas. El
+  flujo es *imprimir y escanear*: el papel firmado va al expediente. Cada
+  impresión queda en auditoría.
+- **Lector de cédula**: por lector USB, por la cámara de la computadora o desde
+  una foto (ZXing.Net, Apache 2.0). Lo leído se muestra ANTES de tocar la ficha.
+
+### Corregido
+
+- **Campos cortados en pantalla.** Era el *"en cita el mes no se ve bien"* de la
+  propuesta: con la ventana sin maximizar, el campo de la fecha de Citas salía
+  partido por la mitad, tapado por el panel de la derecha.
+
+  La causa no era la fecha: las barras de botones se armaban con un `Grid` de
+  columnas `Auto`, que se dibujan a su tamaño **aunque no quepan** — lo que
+  sobra no encoge, se sale del panel y queda debajo de la tarjeta vecina. Ahora
+  esas barras usan `WrapPanel` y el grupo entero baja de renglón: Citas, la
+  ficha del paciente y Medicamentos indicados. Los buscadores de Médicos y
+  Procedimientos pasan de ancho fijo a `MaxWidth`, para encoger en vez de
+  salirse.
+
+- **La ventana tiene un tamaño mínimo** (1024×700, y proporcionalmente más con
+  el texto en Grande, topeado al tamaño de la pantalla). Debajo de eso las
+  pantallas dejan de entrar, y no había nada que lo impidiera: la aplicación
+  abre maximizada, pero nada frenaba achicarla hasta partir la interfaz.
+
+- Se revisaron **las 22 pantallas** con un verificador nuevo
+  (`scripts/verificar_desborde`) que arma cada una a los anchos reales del
+  shell —incluido el texto en Grande— y marca todo lo que se dibuja fuera de su
+  contenedor. A partir de 720 px de contenido, el mínimo nuevo, no se sale nada
+  en ninguna. Queda en el repositorio para correrlo antes de cada entrega,
+  junto al verificador de recursos XAML.
+
+- **Citas ya no tira el error al abrirse.** `DisplayDateStart` del calendario de
+  "Nueva cita" apuntaba a `PrimerDiaAgendable`, que es de solo lectura, y WPF
+  liga esa propiedad TwoWay por defecto: al entrar a Citas saltaba *"A TwoWay or
+  OneWayToSource binding cannot work on the read-only property"*. Va con
+  `Mode=OneWay`, igual que el `DisplayDateEnd` de la ficha del paciente, que
+  tenía el mismo defecto sin que nadie lo hubiera reportado todavía. Queda un
+  verificador nuevo (`scripts/verificar_bindings_solo_lectura.py`) que los busca
+  en todos los XAML.
+
+- **Configuración → Seguros/ARS**: el botón salía cortado ("Activar / desactiv")
+  porque la columna tenía 140 px fijos; ahora mide su contenido. El estado de
+  cada fila queda centrado debajo de su encabezado.
+
+- **Fiados** era la única pantalla con la grilla sin el estilo de la casa: fondo
+  gris, líneas y encabezados de Windows. Ahora usa la misma tabla que el resto,
+  con el paciente y su teléfono en una sola columna (el nombre completo deja de
+  recortarse), el número de factura en monoespaciada, el monto alineado a la
+  derecha y la pastilla de vencimiento centrada. Con la lista vacía explica que
+  no hay nada fiado en vez de mostrar una tabla en blanco.
+
+- **Correr desde el código ya no obliga a editar un archivo versionado.** La
+  cadena de conexión se puede poner en la variable de entorno
+  `MED100_CONEXION`, que pisa la del `App.config`. El repositorio sigue
+  viajando con los valores de ejemplo —las credenciales no se suben nunca— y
+  ahora el aviso lo dice con todas las letras cuando la cadena todavía está sin
+  completar, en vez de mandar a revisar un archivo donde no se ve nada raro.
+  En la clínica no cambia nada: ahí la cadena la escribe el instalador.
+
+### Pendiente de la propuesta
+
+- Nada: la aclaración del *"mes"* llegó el 2026-09-25 y entró en esta misma
+  versión.
+
+### Notas
+
+- El texto de consentimiento que trae el sistema es un **punto de partida**: lo
+  que firma el paciente lo define la clínica y conviene que lo revise su
+  abogado (Ley 172-13, ver `scripts/db/015_consentimientos.sql`).
+- El formato del código de la cédula dominicana no está documentado y cambia
+  entre emisiones. El lector reconoce lo que es inequívoco (los 11 dígitos, una
+  fecha creíble, el sexo) y **no adivina** el resto; con un escaneo de una
+  cédula real se le agrega el formato exacto.
+
 ## [1.3.0] — 2026-09-10 · El producto se llama Odonto Unión
 
 La clínica mandó su nombre y su logo el 2026-09-07: *"ya te mando el nombre:

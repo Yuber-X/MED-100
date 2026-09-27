@@ -37,7 +37,7 @@
 ; =============================================================
 
 #define AppNombre "Odonto Unión"
-#define AppVersion "1.3.0"
+#define AppVersion "1.4.0"
 #define AppEditor "Yuber Santana"
 #define AppExe "MED100.App.exe"
 #define AppTelefono "849-438-0242"

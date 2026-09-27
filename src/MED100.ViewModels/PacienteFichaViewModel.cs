@@ -96,6 +96,19 @@ public partial class PacienteFichaViewModel : ObservableObject
     /// <summary>El shell lleva a la agenda con este paciente ya elegido.</summary>
     public event Action<long>? CitaSolicitada;
 
+    /// <summary>
+    /// Cobrarle un procedimiento sin salir a buscarlo de nuevo (pedido de la
+    /// clínica 2026-09-21). Lleva el id y el nombre para el aviso de la caja.
+    /// </summary>
+    public event Action<long, string>? CobroSolicitado;
+
+    /// <summary>
+    /// Abrir los consentimientos informados para este paciente (pedido de la
+    /// clínica 2026-09-21): se imprime el papel y el paciente lo firma antes
+    /// del procedimiento.
+    /// </summary>
+    public event Action<long>? ConsentimientoSolicitado;
+
     public PacienteFichaViewModel(ClienteService pacientes, TurnoService turnos,
         IDialogService dialogos)
     {
@@ -265,6 +278,20 @@ public partial class PacienteFichaViewModel : ObservableObject
     /// </summary>
     [RelayCommand]
     private void AgendarCita() => CitaSolicitada?.Invoke(PacienteId);
+
+    /// <summary>
+    /// Lleva a la caja con este paciente puesto: ahí se agregan los
+    /// procedimientos, se rebaja (hasta el tope) y se cobra.
+    /// </summary>
+    [RelayCommand]
+    private void CobrarProcedimiento() => CobroSolicitado?.Invoke(PacienteId, Nombre);
+
+    /// <summary>
+    /// Abre la lista de consentimientos con este paciente puesto. Lo firmado
+    /// vuelve escaneado a su expediente: acá no se guarda ninguna firma.
+    /// </summary>
+    [RelayCommand]
+    private void ConsentimientoInformado() => ConsentimientoSolicitado?.Invoke(PacienteId);
 
     [RelayCommand]
     private Task RecargarAsync() => CargarAsync(PacienteId);

@@ -212,6 +212,7 @@ CREATE TABLE ars (
 CREATE TABLE procedimiento (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   codigo           VARCHAR(50)   NULL,
+  categoria        VARCHAR(100)  NULL,          -- 014: agrupa los procedimientos (texto libre)
   nombre           VARCHAR(200)  NOT NULL,
   precio           DECIMAL(15,2) NOT NULL,
   duracion_minutos INT UNSIGNED  NOT NULL DEFAULT 30,
@@ -223,7 +224,8 @@ CREATE TABLE procedimiento (
   deleted_at       DATETIME      NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_procedimiento_codigo (codigo),
-  KEY ix_procedimiento_nombre (nombre)
+  KEY ix_procedimiento_nombre (nombre),
+  KEY ix_procedimiento_categoria (categoria)
 ) ENGINE=InnoDB;
 
 -- -------------------------------------------------------------

@@ -16,6 +16,8 @@ public record ProcedimientoFila(Procedimiento Procedimiento)
     public string CodigoTexto =>
         string.IsNullOrWhiteSpace(Procedimiento.Codigo) ? "—" : Procedimiento.Codigo!;
     public string Nombre => Procedimiento.Nombre;
+    public string CategoriaTexto =>
+        string.IsNullOrWhiteSpace(Procedimiento.Categoria) ? "—" : Procedimiento.Categoria!;
     public decimal Precio => Procedimiento.Precio;
     public bool Activo => Procedimiento.Activo;
     public bool ExentoItbis => Procedimiento.ExentoItbis;
@@ -63,6 +65,13 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
     }
 
     public ObservableCollection<ProcedimientoFila> Procedimientos { get; } = [];
+
+    /// <summary>
+    /// Las categorías que ya se escribieron (014). El formulario las ofrece
+    /// para que "Endodoncia" no termine cargada también como "endodoncia" o
+    /// "Endodoncias": la clínica no tiene un catálogo cerrado y esto lo arma solo.
+    /// </summary>
+    public ObservableCollection<string> CategoriasUsadas { get; } = [];
 
     // ---------- Agendar desde el tarifario ----------
     //
@@ -119,6 +128,7 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
     [ObservableProperty] private bool _editando;
     [ObservableProperty] private long? _editandoId;
     [ObservableProperty] private string _codigo = string.Empty;
+    [ObservableProperty] private string _categoria = string.Empty;
     [ObservableProperty] private string _nombre = string.Empty;
     [ObservableProperty] private string _precioTexto = string.Empty;
     [ObservableProperty] private string _duracionTexto = "30";
@@ -153,13 +163,23 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
             var filas = todos
                 .Where(p => filtro.Length == 0 ||
                             p.Nombre.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
-                            (p.Codigo ?? string.Empty).Contains(filtro, StringComparison.OrdinalIgnoreCase))
+                            (p.Codigo ?? string.Empty).Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
+                            (p.Categoria ?? string.Empty).Contains(filtro, StringComparison.OrdinalIgnoreCase))
                 .Select(p => new ProcedimientoFila(p))
                 .ToList();
 
             Procedimientos.Clear();
             foreach (var f in filas)
                 Procedimientos.Add(f);
+
+            CategoriasUsadas.Clear();
+            foreach (var categoria in todos
+                         .Select(p => p.Categoria)
+                         .Where(c => !string.IsNullOrWhiteSpace(c))
+                         .Select(c => c!.Trim())
+                         .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                         .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase))
+                CategoriasUsadas.Add(categoria);
 
             var activos = todos.Count(p => p.Activo);
             Resumen = $"{activos} activos de {todos.Count} en el tarifario";
@@ -183,7 +203,7 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
     private void Nuevo()
     {
         EditandoId = null;
-        Codigo = Nombre = Descripcion = string.Empty;
+        Codigo = Nombre = Descripcion = Categoria = string.Empty;
         PrecioTexto = string.Empty;
         DuracionTexto = "30";
         // Siempre exento: los servicios de salud no llevan ITBIS en RD y la
@@ -207,6 +227,7 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
 
         EditandoId = p.Id;
         Codigo = p.Codigo ?? string.Empty;
+        Categoria = p.Categoria ?? string.Empty;
         Nombre = p.Nombre;
         PrecioTexto = p.Precio.ToString("0.##", CulturaRd);
         DuracionTexto = p.DuracionMinutos.ToString(CulturaRd);
@@ -243,7 +264,8 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
             }
 
             var datos = new ProcedimientoDatos(Codigo, Nombre, precio, duracion,
-                ExentoItbis, Descripcion, Activo);
+                ExentoItbis, Descripcion, Activo,
+                Categoria: string.IsNullOrWhiteSpace(Categoria) ? null : Categoria.Trim());
 
             if (EditandoId is { } id)
                 await _servicio.ActualizarAsync(id, datos);
@@ -263,6 +285,17 @@ public partial class ProcedimientosViewModel : ObservableObject, IPaginaAsincron
             _dialogos.MostrarError("Procedimientos", $"No se pudo guardar.\n\n{ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Abrir los textos de consentimiento informado (2026-09-21). Los textos son
+    /// parte del catálogo: quien define un procedimiento define lo que el
+    /// paciente firma para hacérselo.
+    /// </summary>
+    public event Action<long?>? ConsentimientosSolicitados;
+
+    /// <summary>Con un procedimiento elegido, la lista se abre filtrada por él.</summary>
+    [RelayCommand]
+    private void Consentimientos() => ConsentimientosSolicitados?.Invoke(Seleccionado?.Id);
 
     [RelayCommand]
     private async Task EliminarAsync()

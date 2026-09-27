@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
@@ -33,6 +33,10 @@ public class AnaliticaTests : IAsyncLifetime
             await Ejecutar(conexion, "DROP DATABASE IF EXISTS med100_analitica_test;");
         }
         await new VerificadorBaseDatos(CadenaTest).CrearEsquemaAsync();
+        // Una instalacion real tambien corre los parches de apertura al abrir
+        // (ncf_secuencia, licencia, columnas nuevas). Sin esto la base de prueba
+        // nace a medias y fallan pruebas que no tienen nada que ver.
+        await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
 
         // MED-100 nace con el ITBIS APAGADO porque los servicios de salud
         // están exentos. Estas pruebas miden reportes y cuadre con números

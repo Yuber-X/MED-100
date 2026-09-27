@@ -689,6 +689,11 @@ public class Procedimiento
 {
     public long Id { get; set; }
     public string? Codigo { get; set; }
+    /// <summary>
+    /// Cómo agrupa la clínica este procedimiento (014): "Endodoncia",
+    /// "Limpieza"… Texto libre; NULL = sin categoría.
+    /// </summary>
+    public string? Categoria { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public decimal Precio { get; set; }
     /// <summary>Cuánto ocupa en la agenda del médico.</summary>
@@ -708,7 +713,9 @@ public record ProcedimientoDatos(
     int DuracionMinutos,
     bool ExentoItbis,
     string? Descripcion,
-    bool Activo = true);
+    bool Activo = true,
+    /// <summary>Cómo agrupa la clínica el procedimiento (014). NULL = sin categoría.</summary>
+    string? Categoria = null);
 
 /// <summary>
 /// Una cita de la agenda.

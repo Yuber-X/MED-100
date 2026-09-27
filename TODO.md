@@ -2,6 +2,65 @@
 
 > Estado vivo del proyecto. Actualizar al cierre de cada bloque de trabajo.
 
+## Versión 1.4.0 (2026-09-25) — propuesta de la clínica del 21/09
+
+Del `PROPUESTA DE MODIFICAICON SISTEMA.docx` (21/09/2026):
+
+- [x] **PROCEDIMIENTO**: columna **Categoría** (migración 014) + búsqueda por
+      categoría + desplegable con las categorías ya usadas
+- [x] **PACIENTE**: "Cobrar procedimiento" desde la ficha (lleva a Cobrar con el
+      paciente puesto)
+- [x] **Tope de rebaja del 10%** por línea, avisado en pantalla y bloqueado al
+      cobrar
+- [x] **Candado del médico**: no se cobra un procedimiento sin médico asignado
+      (ya existía; se mejoró el mensaje)
+- [x] **Quitar un procedimiento** del cobro (ya existía en el carrito)
+- [x] **CITA**: botón para traer la lista completa de pacientes
+- [x] **CITA**: recordatorio de UNA cita a mano, además de la tanda automática
+- [x] **CITA**: volver atrás después de una acción (ya existía)
+- [x] **MEDICAMENTOS**: listado de los más usados (sale del historial) con
+      dosis y frecuencia de la última vez
+- [x] **MEDICAMENTOS**: quitar o corregir UNO de una indicación ya guardada,
+      con auditoría del antes y el después
+- [x] **MEDICAMENTOS**: receta timbrada en hoja carta (logo, exequátur, firma
+      en blanco), con vista previa
+- [x] **CONSENTIMIENTO INFORMADO** (migración 015): catálogo por procedimiento,
+      impresión con los datos del paciente y las dos firmas, auditoría de cada
+      impresión
+- [x] **OTROS**: lector de cédula — USB, cámara de la PC y desde una foto
+- [x] **CITA**: *"el mes no se ve bien"* — aclarado el 2026-09-25: eran los
+      campos cortados por la pantalla. Las barras de botones de Citas, ficha del
+      paciente y Medicamentos indicados pasan a `WrapPanel`, los buscadores de
+      Médicos y Procedimientos a `MaxWidth`, y la ventana gana tamaño mínimo
+      (1024×700, más con el texto grande). Verificado con un arnés que revisa
+      las 22 pantallas a los anchos reales del shell
+
+### Pedidos del 2026-09-26 (capturas en Claude Active)
+- [x] **Citas**: el error que saltaba al abrir la pantalla (binding TwoWay a una
+      propiedad de solo lectura). Arreglado el de Citas y el mismo defecto en la
+      ficha del paciente; queda `scripts/verificar_bindings_solo_lectura.py`
+- [x] **Configuración → Seguros/ARS**: el botón "Activar / desactivar" ya no sale
+      cortado y el estado queda centrado bajo su encabezado
+- [x] **Fiados**: la grilla pasa al estilo de la casa, con paciente + teléfono en
+      una columna, montos a la derecha, pastilla centrada y aviso de lista vacía
+
+### Pruebas manuales de Yuber (1.4.0)
+- [ ] Escribir un consentimiento desde Procedimientos, imprimirlo desde la ficha
+      de un paciente y confirmar que salen sus datos y las dos líneas de firma
+- [ ] Imprimir una receta con un médico que tenga exequátur y otro que no
+- [ ] Elegir un medicamento de "los más usados" y ver que propone la dosis, y
+      que NO pisa lo que ya estaba escrito
+- [ ] Corregir una indicación quitando un medicamento y revisar la auditoría
+- [ ] Intentar cobrar con una rebaja mayor al 10% y ver que se niega
+- [ ] Probar el lector de cédula con el lector USB de la clínica **y** con la
+      cámara; guardar el texto crudo que devuelve para fijar el formato real
+- [ ] Verificar que el consentimiento largo (más de una hoja) se imprime completo
+- [ ] Achicar la ventana hasta el tope y recorrer Citas, la ficha del paciente y
+      Medicamentos indicados: ningún botón ni campo debe quedar cortado
+- [ ] Poner el texto en **Grande** (Configuración → Apariencia) y repetir
+- [ ] Abrir Citas y "Nueva cita": no debe saltar ningún aviso de error
+- [ ] Mirar Fiados con deudas cargadas y con la lista vacía
+
 ## Versión 1.2.0 (2026-09-06) — HECHA, falta prueba manual
 
 Decisiones que Yuber cerró el 2026-09-06 y quedaron implementadas:

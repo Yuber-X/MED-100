@@ -47,6 +47,10 @@ public class ExpedienteTests : IAsyncLifetime
             await Ejecutar(conexion, "DROP DATABASE IF EXISTS med100_expediente_test;");
         }
         await new VerificadorBaseDatos(CadenaTest).CrearEsquemaAsync();
+        // Una instalacion real tambien corre los parches de apertura al abrir
+        // (ncf_secuencia, licencia, columnas nuevas). Sin esto la base de prueba
+        // nace a medias y fallan pruebas que no tienen nada que ver.
+        await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
 
         _factory = new ConexionFactory(CadenaTest);
         _repo = new DocumentoPacienteRepository(_factory);

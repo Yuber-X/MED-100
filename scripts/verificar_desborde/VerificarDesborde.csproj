@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Verificador de desborde de pantallas. NO forma parte de la solución
+    (MED100.sln) a propósito: es una herramienta de verificación, no parte del
+    producto, y meterla en la solución la haría viajar en cada compilación y en
+    el instalador.
+
+    Se corre a mano con "dotnet run" apuntando a esta carpeta
+    (ver la cabecera de Program.cs).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>VerificarDesborde</AssemblyName>
+    <RootNamespace>MED100.Verificacion</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MED100.Views\MED100.Views.csproj" />
+    <ProjectReference Include="..\..\src\MED100.Common\MED100.Common.csproj" />
+  </ItemGroup>
+
+</Project>

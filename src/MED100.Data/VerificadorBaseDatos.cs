@@ -184,6 +184,12 @@ public class VerificadorBaseDatos
                                 WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
             """),
 
+        // 014 — la categoría del procedimiento (pedido de la clínica 2026-09-21).
+        // Sin ella, el tarifario no abre: la consulta la pide por nombre.
+        new("agregar procedimiento.categoria",
+            "ALTER TABLE procedimiento ADD COLUMN categoria VARCHAR(100) NULL AFTER codigo;")
+            { SoloSiFaltaColumna = ("procedimiento", "categoria") },
+
         // 011 — sin esta tabla, la pantalla de Cobrar revienta al buscar el
         // próximo comprobante. Nace VACÍA a propósito: sin autorización de la
         // DGII cargada la app sigue pidiendo el NCF a mano, que es lo correcto.
@@ -329,6 +335,49 @@ public class VerificadorBaseDatos
               JOIN permiso p ON p.id = rp.permiso_id AND p.codigo = 'indicaciones'
              WHERE NOT EXISTS (SELECT 1 FROM usuario_permiso up
                                 WHERE up.usuario_id = u.id AND up.permiso_id = p.id);
+            """),
+
+        // 015 — catálogo de consentimientos informados. Sin permiso nuevo:
+        // editarlos exige `procedimientos` (son parte del catálogo) e
+        // imprimirlos no exige ninguno. Ver scripts/db/015_consentimientos.sql.
+        new("crear la tabla consentimiento", """
+            CREATE TABLE IF NOT EXISTS consentimiento (
+              id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              procedimiento_id BIGINT UNSIGNED NULL,
+              titulo           VARCHAR(150)  NOT NULL,
+              cuerpo           TEXT          NOT NULL,
+              activo           TINYINT(1)    NOT NULL DEFAULT 1,
+              created_at       DATETIME      NOT NULL DEFAULT (UTC_TIMESTAMP()),
+              updated_at       DATETIME      NULL,
+              deleted_at       DATETIME      NULL,
+              PRIMARY KEY (id),
+              KEY ix_consentimiento_procedimiento (procedimiento_id),
+              CONSTRAINT fk_consentimiento_procedimiento FOREIGN KEY (procedimiento_id)
+                REFERENCES procedimiento (id) ON DELETE RESTRICT
+            ) ENGINE=InnoDB;
+            """),
+
+        // La plantilla de ejemplo se siembra UNA vez: si la clínica la reescribe
+        // o la borra, el próximo arranque no se la pisa. El texto legal lo
+        // define la clínica (ver la cabecera del script 015).
+        new("sembrar el consentimiento general de ejemplo", """
+            INSERT INTO consentimiento (procedimiento_id, titulo, cuerpo)
+            SELECT NULL, 'Consentimiento informado general',
+            'Por este documento hago constar que el personal de la clínica me explicó, en un lenguaje que entiendo, en qué consiste el procedimiento que se me va a realizar, para qué se hace y qué se espera de él.
+
+            Se me informó que todo procedimiento tiene riesgos y posibles complicaciones, que pueden incluir molestias, inflamación, sangrado, infección o reacciones a los medicamentos, y que ningún resultado puede garantizarse por completo.
+
+            Se me explicaron las alternativas disponibles, incluida la de no realizarme el procedimiento, y las consecuencias de cada una.
+
+            Tuve la oportunidad de hacer todas las preguntas que quise y me fueron respondidas. Entiendo que puedo retirar este consentimiento en cualquier momento antes del procedimiento.
+
+            Autorizo al personal de la clínica a realizar el procedimiento descrito, así como los cuidados y tratamientos que resulten necesarios durante el mismo.
+
+            Autorizo además el tratamiento de mis datos personales y de salud para los fines de mi atención, conforme a la Ley 172-13 de Protección de Datos Personales.'
+            WHERE NOT EXISTS (
+              SELECT 1 FROM consentimiento
+               WHERE titulo = 'Consentimiento informado general' AND deleted_at IS NULL
+            );
             """),
     ];
 

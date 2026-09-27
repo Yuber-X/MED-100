@@ -18,14 +18,16 @@
          la navegación de la izquierda (que no se encoge) se pisaban entre sí
          al achicar la ventana, y el combo de médico terminaba debajo del botón
          de recordatorios (reportado 2026-08-14). Ahora cada grupo tiene su
-         renglón y ninguno depende del ancho del otro. -->
+         renglón y ninguno depende del ancho del otro.
+
+         WrapPanel y no Grid (reportado por la clínica el 2026-09-25: "el mes no
+         se ve bien" — el campo de la fecha salía cortado por la mitad). En un
+         Grid, las columnas Auto se dibujan a su tamaño aunque no quepan: lo que
+         no entra no encoge, se sale de la columna y lo tapa el panel de la
+         derecha. El WrapPanel baja el grupo entero al renglón siguiente y así
+         no se pierde ningún control. -->
     <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" MinWidth="12" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
+      <WrapPanel>
 
         <!-- Las flechas son PATH, no los glifos ◀ ▶ (reportado 2026-08-14: "se
              ven uno grande y otro pequeño, y el de la derecha cortado"). Esos
@@ -33,7 +35,7 @@
              los saca de donde puede —cada uno de una fuente distinta— y salen
              de tamaños diferentes y a veces recortados. Dibujados, las dos son
              la misma geometría espejada: idénticas por construcción. -->
-        <StackPanel Grid.Column="0" Orientation="Horizontal">
+        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
           <Button Width="40" Style="{DynamicResource Boton.Secundario}"
                   ToolTip="Día anterior"
                   Command="{Binding DiaAnteriorCommand}">
@@ -52,11 +54,15 @@
                   StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                   StrokeLineJoin="Round" />
           </Button>
-          <DatePicker Width="150" Margin="12,0,0,0"
-                      SelectedDate="{Binding Dia, Mode=TwoWay}" />
         </StackPanel>
 
-        <StackPanel Grid.Column="2" Orientation="Horizontal">
+        <!-- La fecha va suelta en el WrapPanel, no dentro del grupo de flechas:
+             así, si la ventana no da ni para eso, baja sola al renglón
+             siguiente en vez de quedar cortada (2026-09-25). -->
+        <DatePicker Width="150" Margin="0,0,16,8"
+                    SelectedDate="{Binding Dia, Mode=TwoWay}" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
           <Button Content="Enviar recordatorios" Margin="0,0,10,0"
                   Style="{DynamicResource Boton.Secundario}"
                   Command="{Binding EnviarRecordatoriosCommand}"
@@ -65,9 +71,9 @@
                   Style="{DynamicResource Boton.Primario}"
                   Command="{Binding NuevaCommand}" />
         </StackPanel>
-      </Grid>
+      </WrapPanel>
 
-      <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+      <WrapPanel Margin="0,2,0,0">
         <TextBlock Text="Ver la agenda de" VerticalAlignment="Center"
                    Style="{DynamicResource Texto.Caption}"
                    Foreground="{DynamicResource Brush.TextoSecundario}" />
@@ -75,7 +81,7 @@
                   ItemsSource="{Binding MedicosFiltro}"
                   SelectedItem="{Binding MedicoFiltro, Mode=TwoWay}"
                   ItemTemplate="{DynamicResource Combo.Nombre}" />
-      </StackPanel>
+      </WrapPanel>
 
       <TextBlock Text="{Binding DiaTexto}" Style="{DynamicResource Texto.Titulo3}" Margin="2,12,0,0" />
       <TextBlock Text="{Binding Resumen}" Style="{DynamicResource Texto.Caption}"
@@ -158,9 +164,21 @@
             <!-- El combo lista los pacientes ya registrados; la caja de arriba
                  solo acota cuando son muchos. -->
             <TextBlock Text="Paciente" Style="{DynamicResource Input.Label}" />
-            <TextBox Style="{DynamicResource Input.Texto}"
-                     Text="{Binding BusquedaPaciente, UpdateSourceTrigger=PropertyChanged, Delay=200}"
-                     ToolTip="Escribí nombre, cédula o teléfono para acotar la lista de abajo" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding BusquedaPaciente, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                       ToolTip="Escribí nombre, cédula o teléfono para acotar la lista de abajo" />
+              <!-- Trae la lista COMPLETA de pacientes (pedido 2026-09-21) -->
+              <Button Grid.Column="2" Content="Buscar paciente…" MinWidth="140"
+                      Style="{DynamicResource Boton.Secundario}"
+                      Click="BuscarPaciente_Click"
+                      ToolTip="Abre la lista completa de pacientes para elegir uno" />
+            </Grid>
             <ComboBox Margin="0,8,0,0"
                       ItemsSource="{Binding PacientesSugeridos}"
                       SelectedItem="{Binding PacienteSeleccionado, Mode=TwoWay}"
@@ -196,8 +214,14 @@
                 <!-- De hoy en adelante (pedido del cliente 2026-08-28). El
                      calendario de arriba SÍ va hacia atrás: consultar la agenda
                      de la semana pasada es normal; agendar en ella, no. -->
+                <!-- Mode=OneWay OBLIGATORIO: DisplayDateStart es de las
+                     propiedades que WPF liga TwoWay por defecto, y
+                     PrimerDiaAgendable es de solo lectura. Sin el modo
+                     explícito, abrir "Nueva cita" tiraba "A TwoWay or
+                     OneWayToSource binding cannot work on the read-only
+                     property" (reportado 2026-09-26). -->
                 <DatePicker SelectedDate="{Binding DiaForm, Mode=TwoWay}"
-                            DisplayDateStart="{Binding PrimerDiaAgendable}" />
+                            DisplayDateStart="{Binding PrimerDiaAgendable, Mode=OneWay}" />
               </StackPanel>
               <StackPanel Grid.Column="2">
                 <TextBlock Text="Duración (min)" Style="{DynamicResource Input.Label}" />
@@ -309,6 +333,12 @@
 
               <!-- Camino corto de la agenda a la caja: lleva el paciente, el
                    médico y el procedimiento ya cargados -->
+              <!-- Recordatorio de ESTA cita (2026-09-21). El de arriba manda la tanda. -->
+              <Button Content="Enviar recordatorio al paciente" Margin="0,12,0,0"
+                      Style="{DynamicResource Boton.Secundario}"
+                      Command="{Binding EnviarRecordatorioDeLaCitaCommand}"
+                      ToolTip="Le manda el correo del recordatorio solo a este paciente" />
+
               <Button Content="Cobrar esta cita" Margin="0,18,0,0"
                       Style="{DynamicResource Boton.Primario}"
                       Command="{Binding CobrarCommand}" />

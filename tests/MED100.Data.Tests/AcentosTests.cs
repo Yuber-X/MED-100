@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using MySqlConnector;
 using MED100.Common;
 using MED100.Data;
@@ -30,6 +30,10 @@ public class AcentosTests : IAsyncLifetime
             await cmd.ExecuteNonQueryAsync();
         }
         await new VerificadorBaseDatos(CadenaTest).CrearEsquemaAsync();
+        // Una instalacion real tambien corre los parches de apertura al abrir
+        // (ncf_secuencia, licencia, columnas nuevas). Sin esto la base de prueba
+        // nace a medias y fallan pruebas que no tienen nada que ver.
+        await new VerificadorBaseDatos(CadenaTest).ActualizarEsquemaAsync();
 
         var factory = new ConexionFactory(CadenaTest);
         var auditoria = new AuditoriaService(new AuditoriaRepository(factory));

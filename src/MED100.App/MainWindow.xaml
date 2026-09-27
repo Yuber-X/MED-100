@@ -5,6 +5,7 @@
         xmlns:vm="clr-namespace:MED100.ViewModels;assembly=MED100.ViewModels"
         Title="{x:Static common:AppInfo.Nombre}"
         Width="1280" Height="760"
+        MinWidth="1024" MinHeight="700"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/MED100.Views;component/Assets/med100.ico"

@@ -1,4 +1,4 @@
-# Manual de Odonto Unión
+﻿# Manual de Odonto Unión
 
 > Guía del día a día, en lenguaje sencillo. No hace falta saber de computadoras.
 
@@ -108,10 +108,25 @@ Lo que cobra la clínica, con su precio:
   procedimiento con la duración mal puesta desordena la agenda entera.
 - **ITBIS: exento o gravado** — importante para la declaración. Muchos servicios
   de salud son exentos; se marca uno por uno.
+- **Categoría** — para agrupar el tarifario (Ortodoncia, Cirugía, Limpieza…). Se
+  escribe libre y el desplegable va proponiendo las que ya usaste. La búsqueda
+  también mira la categoría.
 - **Activo / Inactivo** — el que deja de ofrecerse se desactiva, no se borra, para
   que las facturas viejas sigan cuadrando.
 
 Desde el tarifario puedes **agendar directo**, sin pasar por la pantalla de Citas.
+
+### Consentimiento informado
+
+El botón **Consentimiento informado** abre los textos que el paciente firma antes
+de un procedimiento. Cada texto puede ser de un procedimiento o **general**
+(sirve para cualquiera), y se escribe desde aquí.
+
+El sistema trae uno general de ejemplo para empezar. **El texto que firma el
+paciente lo define la clínica** —riesgos, alternativas y complicaciones cambian
+según el tratamiento— y conviene que lo revise su abogado.
+
+Para imprimirlo se va a la ficha del paciente (ver *Pacientes*).
 
 ---
 
@@ -168,8 +183,30 @@ los documentos.
 
 ## 9. Pacientes
 
-Lista, alta y edición. La **cédula es opcional**: en un colmado la mayoría de la gente no
-se registra, y está bien.
+Lista, alta y edición. La **cédula es opcional**: mucha gente llega sin ella y está
+bien.
+
+### Escanear la cédula
+
+En el alta y la edición, el botón **Escanear** al lado de la cédula lee el código
+de la cédula de tres maneras:
+
+- con un **lector USB** (el que se conecta y "escribe" solo): haz clic en la
+  caja del lector y pasa la cédula;
+- con la **cámara** de la computadora, apuntando al reverso de la cédula;
+- desde una **foto** del reverso, si la cámara no enfoca bien.
+
+Antes de llenar nada, la ventana muestra **lo que entendió**. Solo al apretar
+*Usar estos datos* se completa la ficha, y solo se llenan los campos vacíos: lo
+que ya escribiste manda.
+
+### Desde la ficha del paciente
+
+- **Cobrar procedimiento** — abre la caja con el paciente puesto.
+- **Agendar cita** — abre la agenda con el paciente puesto.
+- **Consentimiento informado** — abre los documentos para imprimir el que
+  corresponda. El paciente lo firma **en papel**; después se escanea y se guarda
+  en su expediente. El sistema no guarda firmas digitales: guarda el papel.
 
 ---
 
@@ -239,6 +276,20 @@ obligatorio — a veces el médico dice "amoxicilina 500 cada 8" y a veces dice
 "algo para el dolor".
 
 Sirve para tener el historial de lo que se indicó durante el día trabajado.
+
+**Los más usados.** El nombre del medicamento es un desplegable con lo que más
+receta la clínica; al elegir uno, propone la dosis y la frecuencia de la última
+vez. Nunca pisa lo que ya escribiste, y siempre puedes escribir uno nuevo.
+
+**Corregir lo ya guardado.** Con una indicación seleccionada, *Corregir
+medicamentos* la trae al formulario para quitar uno, arreglar una dosis o
+agregar el que faltó. Lo del día lo corrige quien lo cargó; lo de días
+anteriores, solo el Administrador. El antes y el después quedan en el historial.
+
+**Imprimir la receta.** *Imprimir receta* arma la receta en hoja carta con el
+logo de la clínica, los medicamentos con su dosis, el nombre del médico y su
+exequátur, y la **línea de la firma en blanco** para que el médico firme de su
+puño y letra.
 
 > 🔒 **Esto es información de salud del paciente.** La Ley 172-13 la trata como
 > dato sensible, así que la pantalla tiene su propio permiso —y ese permiso

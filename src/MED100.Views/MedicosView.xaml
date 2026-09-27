@@ -19,7 +19,10 @@
               Style="{DynamicResource Boton.Primario}"
               Command="{Binding NuevoCommand}" />
       <StackPanel>
-        <TextBox Style="{DynamicResource Input.Texto}" Width="280" HorizontalAlignment="Left"
+        <!-- MaxWidth y no Width: con la ventana angosta, un ancho fijo se sale
+             del panel y lo tapa el de al lado (2026-09-25). Así encoge. -->
+        <TextBox Style="{DynamicResource Input.Texto}" MaxWidth="280" MinWidth="120"
+                 HorizontalAlignment="Left"
                  Text="{Binding Busqueda, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
         <TextBlock Text="{Binding ResumenAhora}" Style="{DynamicResource Texto.Caption}"
                    Foreground="{DynamicResource Brush.TextoSecundario}" Margin="2,6,0,0" />

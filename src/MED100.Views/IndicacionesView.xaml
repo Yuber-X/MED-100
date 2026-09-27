@@ -28,7 +28,10 @@
       <!-- ===== Día ===== -->
       <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
               Style="{DynamicResource Card}" Padding="20" Margin="0,0,0,16">
-        <StackPanel Orientation="Horizontal">
+        <!-- WrapPanel: en una ventana angosta el aviso del día pasado empujaba
+             la fila fuera de la tarjeta y quedaba cortada (el mismo defecto que
+             reportó la clínica en Citas el 2026-09-25). -->
+        <WrapPanel>
           <TextBlock Text="Día" Style="{DynamicResource Input.Label}"
                      VerticalAlignment="Center" Margin="0,0,10,0" />
           <DatePicker SelectedDate="{Binding Dia}" Width="160" Height="36" FontSize="13" />
@@ -38,8 +41,9 @@
                      Style="{DynamicResource Texto.Caption}"
                      Foreground="{DynamicResource Brush.PorVencer.Texto}"
                      VerticalAlignment="Center" Margin="16,0,0,0"
+                     TextWrapping="Wrap" MaxWidth="320"
                      Visibility="{Binding EsDiaPasado, Converter={StaticResource BoolAVisibilidad}}" />
-        </StackPanel>
+        </WrapPanel>
       </Border>
 
       <!-- ===== Lo indicado ese día ===== -->
@@ -50,17 +54,25 @@
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
 
-          <DataGrid Grid.Row="0" ItemsSource="{Binding DelDia}"
+          <!-- Style="Tabla": era la otra grilla que había quedado con el look
+               por defecto de WPF (2026-09-26), igual que la de Fiados. -->
+          <DataGrid Grid.Row="0" Style="{DynamicResource Tabla}"
+                    ItemsSource="{Binding DelDia}"
                     SelectedItem="{Binding Seleccionada}"
-                    AutoGenerateColumns="False" IsReadOnly="True"
-                    HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                    CanUserResizeRows="False" SelectionMode="Single"
                     RowDetailsVisibilityMode="VisibleWhenSelected">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Paciente" Binding="{Binding ClienteNombre}" Width="180" />
-              <DataGridTextColumn Header="Médico" Binding="{Binding MedicoNombre}" Width="150" />
-              <DataGridTextColumn Header="Medicamentos" Binding="{Binding ResumenMedicamentos}" Width="*" />
-              <DataGridTextColumn Header="Cargó" Binding="{Binding UsuarioNombre}" Width="130" />
+              <DataGridTextColumn Header="Paciente" Binding="{Binding ClienteNombre}"
+                                  Width="Auto" MinWidth="150"
+                                  HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+              <DataGridTextColumn Header="Médico" Binding="{Binding MedicoNombre}"
+                                  Width="Auto" MinWidth="130"
+                                  HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+              <DataGridTextColumn Header="Medicamentos" Binding="{Binding ResumenMedicamentos}"
+                                  Width="*" MinWidth="160"
+                                  HeaderStyle="{StaticResource Tabla.Encabezado.Izquierda}" />
+              <DataGridTextColumn Header="Cargó" Binding="{Binding UsuarioNombre}"
+                                  Width="Auto" MinWidth="110"
+                                  ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
             </DataGrid.Columns>
 
             <!-- El detalle completo se abre al seleccionar: en la fila solo
@@ -84,14 +96,41 @@
             </DataGrid.RowDetailsTemplate>
           </DataGrid>
 
-          <!-- Dar de baja es solo del Admin: corregir lo que consta que se le
-               indicó a un paciente no es una operación de mostrador. -->
-          <Button Grid.Row="1" Content="Dar de baja lo seleccionado"
-                  Style="{DynamicResource Boton.Secundario}"
-                  HorizontalAlignment="Left" Margin="16,0,16,16"
-                  Command="{Binding EliminarCommand}"
-                  IsEnabled="{Binding HaySeleccion}"
-                  Visibility="{Binding EsAdmin, Converter={StaticResource BoolAVisibilidad}}" />
+          <!-- WrapPanel: con la ventana angosta, los tres botones en fila se
+               salían de la tarjeta (2026-09-25).
+               Separado de la grilla por una línea y 16 px de aire: pegados
+               parecían parte de la última fila (2026-09-26). -->
+          <Border Grid.Row="1" BorderThickness="0,1,0,0"
+                  BorderBrush="{DynamicResource Brush.BordeSutil}" />
+          <WrapPanel Grid.Row="1" Margin="16,16,16,16">
+            <!-- Quitar o arreglar UN medicamento de lo ya guardado
+                 (pedido de la clínica 2026-09-21). Lo trae al formulario de la
+                 derecha en vez de abrir otra pantalla. -->
+            <Button Content="Corregir medicamentos" Margin="0,0,10,8"
+                    Style="{DynamicResource Boton.Secundario}"
+                    Command="{Binding CorregirCommand}"
+                    IsEnabled="{Binding PuedeCorregir}"
+                    ToolTip="Trae lo seleccionado al formulario para quitar, cambiar o agregar un medicamento" />
+
+            <!-- La receta se entrega al paciente: hoja carta con el membrete de
+                 la clínica y la línea de la firma (pedido 2026-09-21). Se puede
+                 imprimir también de días pasados: el paciente vuelve y la
+                 pierde. -->
+            <Button Content="Imprimir receta" Margin="0,0,10,8"
+                    Style="{DynamicResource Boton.Secundario}"
+                    Command="{Binding ImprimirRecetaCommand}"
+                    IsEnabled="{Binding HaySeleccion}"
+                    ToolTip="Abre la vista previa de la receta en hoja carta para imprimirla" />
+
+            <!-- Dar de baja la indicación COMPLETA es solo del Admin: no es una
+                 corrección, es borrar lo que consta que se le indicó. -->
+            <Button Content="Dar de baja" Margin="0,0,0,8"
+                    Style="{DynamicResource Boton.Secundario}"
+                    Command="{Binding EliminarCommand}"
+                    ToolTip="Da de baja la indicación seleccionada (pide el motivo)"
+                    IsEnabled="{Binding HaySeleccion}"
+                    Visibility="{Binding EsAdmin, Converter={StaticResource BoolAVisibilidad}}" />
+          </WrapPanel>
         </Grid>
       </Border>
 
@@ -99,35 +138,56 @@
       <Border Grid.Row="1" Grid.Column="2" Style="{DynamicResource Card}" Padding="20"
               VerticalAlignment="Top"
               Visibility="{Binding PuedeCargar, Converter={StaticResource BoolAVisibilidad}}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="620">
+        <!-- Padding a la derecha: sin eso la barra del scroll queda encima de
+             los campos y el formulario se ve apretado contra el borde
+             (2026-09-26). -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="620"
+                      Padding="0,0,12,0">
           <StackPanel>
-            <TextBlock Text="Anotar lo indicado" Style="{DynamicResource Texto.Titulo3}" />
+            <TextBlock Text="{Binding TituloFormulario}" Style="{DynamicResource Texto.Titulo3}" />
             <TextBlock Style="{DynamicResource Texto.Caption}" TextWrapping="Wrap" Margin="0,4,0,14"
                        Text="Se anota QUÉ le mandó a tomar el médico. No es un expediente clínico: acá no va el diagnóstico ni el motivo." />
 
+            <!-- Corrigiendo, el paciente y el médico quedan a la vista pero
+                 bloqueados: cambiarle el paciente a algo ya guardado no es
+                 corregir. Queda el rastro de la corrección en auditoría. -->
             <TextBlock Text="Paciente" Style="{DynamicResource Input.Label}" />
             <ComboBox Height="40" FontSize="13" Margin="0,6,0,0"
                       IsEditable="True" IsTextSearchEnabled="True"
                       DisplayMemberPath="Etiqueta"
                       ItemsSource="{Binding Pacientes}"
-                      SelectedItem="{Binding PacienteSeleccionado}" />
+                      SelectedItem="{Binding PacienteSeleccionado}"
+                      IsEnabled="{Binding PuedeCambiarCabecera}" />
 
             <TextBlock Text="Médico que lo indicó" Style="{DynamicResource Input.Label}" Margin="0,12,0,0" />
             <ComboBox Height="40" FontSize="13" Margin="0,6,0,0"
                       DisplayMemberPath="Etiqueta"
                       ItemsSource="{Binding Medicos}"
-                      SelectedItem="{Binding MedicoSeleccionado}" />
+                      SelectedItem="{Binding MedicoSeleccionado}"
+                      IsEnabled="{Binding PuedeCambiarCabecera}" />
 
-            <TextBlock Text="Medicamentos" Style="{DynamicResource Input.Label}" Margin="0,16,0,0" />
+            <TextBlock Text="Medicamentos" Style="{DynamicResource Input.Label}" Margin="0,20,0,0" />
             <ItemsControl ItemsSource="{Binding Renglones}" Margin="0,6,0,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Border BorderBrush="{DynamicResource Brush.BordeSutil}" BorderThickness="1"
-                          CornerRadius="6" Padding="10" Margin="0,0,0,8">
+                          CornerRadius="8" Padding="12" Margin="0,0,0,10">
                     <StackPanel>
-                      <TextBox Style="{DynamicResource Input.Texto}"
-                               Text="{Binding Medicamento, UpdateSourceTrigger=PropertyChanged}"
-                               ToolTip="Nombre del medicamento. Es lo único obligatorio." />
+                      <!-- Se elige de los más usados o se escribe uno nuevo
+                           (pedido de la clínica 2026-09-21).
+                           IsTextSearchEnabled="False" a propósito: el
+                           autocompletado del combo cambia lo tipeado por el
+                           ítem que más se parece, y escribir un medicamento por
+                           otro es exactamente el error que no se puede cometer
+                           acá. Para elegir está el desplegable. -->
+                      <ComboBox Height="36" FontSize="13"
+                                IsEditable="True" IsTextSearchEnabled="False"
+                                DisplayMemberPath="Medicamento"
+                                ItemsSource="{Binding DataContext.MasUsados,
+                                             RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                SelectedItem="{Binding Sugerencia}"
+                                Text="{Binding Medicamento, UpdateSourceTrigger=PropertyChanged}"
+                                ToolTip="Elegí uno de los más usados o escribí el nombre. Es lo único obligatorio." />
                       <Grid Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -161,18 +221,24 @@
             </ItemsControl>
 
             <Button Content="Agregar otro medicamento" Style="{DynamicResource Boton.Secundario}"
-                    HorizontalAlignment="Left" Command="{Binding AgregarRenglonCommand}" />
+                    HorizontalAlignment="Left" Margin="0,2,0,0"
+                    Command="{Binding AgregarRenglonCommand}" />
 
-            <TextBlock Text="Nota (opcional)" Style="{DynamicResource Input.Label}" Margin="0,14,0,0" />
+            <TextBlock Text="Nota (opcional)" Style="{DynamicResource Input.Label}" Margin="0,20,0,0" />
             <TextBox Style="{DynamicResource Input.Texto}" Margin="0,6,0,0"
                      Height="60" TextWrapping="Wrap" AcceptsReturn="True"
                      VerticalContentAlignment="Top"
                      Text="{Binding Notas, UpdateSourceTrigger=PropertyChanged}" />
 
-            <Button Content="Guardar" Style="{DynamicResource Boton.Primario}"
-                    Margin="0,16,0,0" HorizontalAlignment="Stretch"
+            <Button Content="{Binding TextoBotonGuardar}" Style="{DynamicResource Boton.Primario}"
+                    Margin="0,20,0,0" HorizontalAlignment="Stretch"
                     Command="{Binding GuardarCommand}"
                     IsEnabled="{Binding Ocupado, Converter={StaticResource InversorBool}}" />
+
+            <Button Content="Cancelar la corrección" Style="{DynamicResource Boton.Secundario}"
+                    Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                    Command="{Binding CancelarCorreccionCommand}"
+                    Visibility="{Binding EnCorreccion, Converter={StaticResource BoolAVisibilidad}}" />
           </StackPanel>
         </ScrollViewer>
       </Border>

@@ -30,26 +30,53 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <!-- ===== Barra superior ===== -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,16">
-      <Button DockPanel.Dock="Right" Content="Editar paciente"
-              Style="{DynamicResource Boton.Primario}"
-              Visibility="{Binding PuedeEditar, Converter={StaticResource BoolAVisibilidad}}"
-              Command="{Binding EditarCommand}" />
-      <!-- La cita también se pone desde acá (pedido de la clínica 2026-08-27):
-           cuando el paciente pide turno, la recepción está mirando su ficha, no
-           la agenda. Lleva a Citas con el paciente ya elegido. -->
-      <Button DockPanel.Dock="Right" Content="Agendar cita" Margin="0,0,10,0"
-              Style="{DynamicResource Boton.Secundario}"
-              Visibility="{Binding PuedeAgendar, Converter={StaticResource BoolAVisibilidad}}"
-              Command="{Binding AgendarCitaCommand}" />
-      <Button DockPanel.Dock="Right" Content="Actualizar" Margin="0,0,10,0"
-              Style="{DynamicResource Boton.Secundario}"
-              Command="{Binding RecargarCommand}" />
-      <Button Content="◀  Volver a la lista" HorizontalAlignment="Left"
+    <!-- ===== Barra superior =====
+         Grid + WrapPanel y no DockPanel: con cinco botones y la ventana
+         angosta, el DockPanel le daba su ancho entero a cada botón anclado a la
+         derecha y al último —"Volver a la lista"— lo dejaba sin espacio, cortado
+         (el mismo defecto que reportó la clínica en Citas el 2026-09-25). Así
+         los botones bajan de renglón y "Volver" nunca se pierde. -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Button Grid.Column="0" Content="◀  Volver a la lista"
+              VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,0,10,0"
               Style="{DynamicResource Boton.Secundario}"
               Command="{Binding VolverCommand}" />
-    </DockPanel>
+
+      <!-- El orden es el que se ve de izquierda a derecha: "Editar paciente"
+           queda al final, que es donde estaba con el DockPanel. -->
+      <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+        <Button Content="Actualizar" Margin="10,0,0,8"
+                Style="{DynamicResource Boton.Secundario}"
+                Command="{Binding RecargarCommand}" />
+        <!-- La cita también se pone desde acá (pedido de la clínica 2026-08-27):
+             cuando el paciente pide turno, la recepción está mirando su ficha, no
+             la agenda. Lleva a Citas con el paciente ya elegido. -->
+        <Button Content="Agendar cita" Margin="10,0,0,8"
+                Style="{DynamicResource Boton.Secundario}"
+                Visibility="{Binding PuedeAgendar, Converter={StaticResource BoolAVisibilidad}}"
+                Command="{Binding AgendarCitaCommand}" />
+        <Button Content="Cobrar procedimiento" Margin="10,0,0,8"
+                Style="{DynamicResource Boton.Secundario}"
+                Command="{Binding CobrarProcedimientoCommand}"
+                ToolTip="Abre la caja con este paciente puesto para agregarle procedimientos y cobrar" />
+        <!-- El papel que el paciente firma antes del procedimiento
+             (pedido de la clínica 2026-09-21). Se imprime, se firma a mano y
+             vuelve escaneado al expediente. -->
+        <Button Content="Consentimiento informado" Margin="10,0,0,8"
+                Style="{DynamicResource Boton.Secundario}"
+                Command="{Binding ConsentimientoInformadoCommand}"
+                ToolTip="Abre los documentos de consentimiento para imprimir el que corresponda" />
+        <Button Content="Editar paciente" Margin="10,0,0,8"
+                Style="{DynamicResource Boton.Primario}"
+                Visibility="{Binding PuedeEditar, Converter={StaticResource BoolAVisibilidad}}"
+                Command="{Binding EditarCommand}" />
+      </WrapPanel>
+    </Grid>
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
       <StackPanel>

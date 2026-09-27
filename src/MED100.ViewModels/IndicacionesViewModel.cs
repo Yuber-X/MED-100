@@ -22,6 +22,38 @@ public partial class RenglonMedicamento : ObservableObject
     [ObservableProperty] private string _duracion = string.Empty;
     [ObservableProperty] private string _instrucciones = string.Empty;
 
+    /// <summary>
+    /// El medicamento elegido del listado de los más usados (2026-09-21). Al
+    /// elegirlo se completan dosis, frecuencia y duración con las de la última
+    /// vez, pero SOLO las que están en blanco: si ya se escribió algo, manda lo
+    /// que se escribió. Autocompletar arriba de la dosis de otro paciente es
+    /// justo el error que no se puede cometer acá.
+    /// </summary>
+    [ObservableProperty] private MedicamentoFrecuente? _sugerencia;
+
+    public RenglonMedicamento() { }
+
+    /// <summary>Carga un renglón ya guardado para poder corregirlo.</summary>
+    public RenglonMedicamento(IndicacionMedicamento m)
+    {
+        _medicamento = m.Medicamento;
+        _dosis = m.Dosis ?? string.Empty;
+        _frecuencia = m.Frecuencia ?? string.Empty;
+        _duracion = m.Duracion ?? string.Empty;
+        _instrucciones = m.Instrucciones ?? string.Empty;
+    }
+
+    partial void OnSugerenciaChanged(MedicamentoFrecuente? value)
+    {
+        if (value is null)
+            return;
+
+        Medicamento = value.Medicamento;
+        if (string.IsNullOrWhiteSpace(Dosis)) Dosis = value.Dosis ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(Frecuencia)) Frecuencia = value.Frecuencia ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(Duracion)) Duracion = value.Duracion ?? string.Empty;
+    }
+
     public IndicacionMedicamento AModelo() => new()
     {
         Medicamento = Medicamento.Trim(),
@@ -72,12 +104,32 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
     public ObservableCollection<Opcion<long?>> Medicos { get; } = [];
     public ObservableCollection<RenglonMedicamento> Renglones { get; } = [];
 
+    /// <summary>
+    /// Los medicamentos que más se indican, para elegirlos del desplegable en
+    /// vez de tipearlos (pedido de la clínica 2026-09-21).
+    /// </summary>
+    public ObservableCollection<MedicamentoFrecuente> MasUsados { get; } = [];
+
+    /// <summary>
+    /// Pide imprimir la receta de lo seleccionado (pedido de la clínica
+    /// 2026-09-21). El ViewModel no toca ventanas ni impresoras: arma los datos
+    /// y App los lleva a la vista previa, igual que el turno y el cierre.
+    /// </summary>
+    public event Action<RecetaImpresa>? RecetaSolicitada;
+
     [ObservableProperty] private DateTime _dia;
     [ObservableProperty] private Opcion<long?>? _pacienteSeleccionado;
     [ObservableProperty] private Opcion<long?>? _medicoSeleccionado;
     [ObservableProperty] private string _notas = string.Empty;
     [ObservableProperty] private bool _ocupado;
     [ObservableProperty] private Indicacion? _seleccionada;
+
+    /// <summary>
+    /// Id de la indicación que se está corrigiendo, o null si el formulario es
+    /// para una nueva. Es lo que hace que el mismo formulario sirva para las dos
+    /// cosas: corregir en otra pantalla obligaría a duplicar los renglones.
+    /// </summary>
+    [ObservableProperty] private long? _corrigiendoId;
 
     public bool PuedeRegistrar => SesionActual.TienePermiso("indicaciones");
     public bool EsAdmin => SesionActual.EsAdmin;
@@ -92,13 +144,48 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
 
     public bool PuedeCargar => PuedeRegistrar && !EsDiaPasado;
 
-    partial void OnSeleccionadaChanged(Indicacion? value) =>
+    public bool EnCorreccion => CorrigiendoId is not null;
+
+    /// <summary>
+    /// Solo se corrige lo del día que se está mirando y siendo hoy: para atrás
+    /// la pantalla entera es de lectura (ver <see cref="EsDiaPasado"/>).
+    /// </summary>
+    public bool PuedeCorregir => HaySeleccion && PuedeCargar;
+
+    public string TituloFormulario =>
+        EnCorreccion ? "Corregir los medicamentos" : "Anotar lo indicado";
+
+    public string TextoBotonGuardar =>
+        EnCorreccion ? "Guardar los cambios" : "Guardar";
+
+    /// <summary>
+    /// Corrigiendo se tocan los medicamentos, no a quién ni quién lo indicó:
+    /// cambiarle el paciente a algo ya guardado no es corregir, es otra cosa.
+    /// </summary>
+    public bool PuedeCambiarCabecera => !EnCorreccion;
+
+    partial void OnCorrigiendoIdChanged(long? value)
+    {
+        OnPropertyChanged(nameof(EnCorreccion));
+        OnPropertyChanged(nameof(TituloFormulario));
+        OnPropertyChanged(nameof(TextoBotonGuardar));
+        OnPropertyChanged(nameof(PuedeCambiarCabecera));
+    }
+
+    partial void OnSeleccionadaChanged(Indicacion? value)
+    {
         OnPropertyChanged(nameof(HaySeleccion));
+        OnPropertyChanged(nameof(PuedeCorregir));
+    }
 
     partial void OnDiaChanged(DateTime value)
     {
         OnPropertyChanged(nameof(EsDiaPasado));
         OnPropertyChanged(nameof(PuedeCargar));
+        OnPropertyChanged(nameof(PuedeCorregir));
+        // Cambiar de día deja a medias cualquier corrección: lo que está en el
+        // formulario es de una indicación que ya no se ve en la lista.
+        LimpiarFormulario();
         _ = CargarDelDiaAsync();
     }
 
@@ -133,6 +220,7 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
                 Medicos.Add(new Opcion<long?>(m.Id, m.Nombre));
             MedicoSeleccionado = Medicos.FirstOrDefault(m => m.Valor == medicoPrevio) ?? Medicos[0];
 
+            await CargarMasUsadosAsync();
             await CargarDelDiaAsync();
         }
         catch (UnauthorizedAccessException)
@@ -148,6 +236,26 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
         finally
         {
             Ocupado = false;
+        }
+    }
+
+    /// <summary>
+    /// Los más usados son una ayuda para escribir, no un dato de la pantalla:
+    /// si la consulta falla, la pantalla sigue sirviendo con el campo libre y
+    /// queda el aviso en el log. No se le corta la jornada a nadie por esto.
+    /// </summary>
+    private async Task CargarMasUsadosAsync()
+    {
+        try
+        {
+            var lista = await _indicaciones.ObtenerMasUsadosAsync();
+            MasUsados.Clear();
+            foreach (var m in lista)
+                MasUsados.Add(m);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "No se pudo cargar el listado de medicamentos más usados");
         }
     }
 
@@ -179,6 +287,7 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
     /// </summary>
     private void LimpiarFormulario()
     {
+        CorrigiendoId = null;
         Renglones.Clear();
         for (var i = 0; i < 3; i++)
             Renglones.Add(new RenglonMedicamento());
@@ -201,9 +310,101 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
             Renglones.Add(new RenglonMedicamento());
     }
 
+    /// <summary>
+    /// Trae lo seleccionado al formulario para quitarle un medicamento,
+    /// arreglarle la dosis o agregarle el que faltó (pedido de la clínica
+    /// 2026-09-21). El paciente y el médico quedan a la vista pero bloqueados.
+    /// </summary>
+    [RelayCommand]
+    private void Corregir()
+    {
+        if (Seleccionada is not { } indicacion || !PuedeCargar)
+            return;
+
+        CorrigiendoId = indicacion.Id;
+        PacienteSeleccionado = Pacientes.FirstOrDefault(p => p.Valor == indicacion.ClienteId);
+        MedicoSeleccionado = Medicos.FirstOrDefault(m => m.Valor == indicacion.MedicoId)
+                             ?? Medicos.FirstOrDefault();
+        Notas = indicacion.Notas ?? string.Empty;
+
+        Renglones.Clear();
+        foreach (var m in indicacion.Medicamentos)
+            Renglones.Add(new RenglonMedicamento(m));
+        if (Renglones.Count == 0)
+            Renglones.Add(new RenglonMedicamento());
+    }
+
+    [RelayCommand]
+    private void CancelarCorreccion() => LimpiarFormulario();
+
+    /// <summary>
+    /// Arma la receta de lo seleccionado y la manda a la vista previa.
+    ///
+    /// Se leen el paciente y el médico de nuevo en vez de usar lo que trae la
+    /// lista: la receta necesita la cédula, la edad y el exequátur, que no
+    /// están en la grilla. Si el médico no está cargado igual se imprime, con
+    /// la línea de la firma y el exequátur en blanco — es un papel que se
+    /// completa a mano.
+    /// </summary>
+    [RelayCommand]
+    private async Task ImprimirRecetaAsync()
+    {
+        if (Seleccionada is not { } indicacion)
+            return;
+
+        try
+        {
+            Ocupado = true;
+
+            var paciente = await _clientes.ObtenerPorIdAsync(indicacion.ClienteId);
+            var medico = indicacion.MedicoId is { } medicoId
+                ? await _medicos.ObtenerPorIdAsync(medicoId)
+                : null;
+
+            RecetaSolicitada?.Invoke(new RecetaImpresa(
+                paciente?.Nombre ?? indicacion.ClienteNombre,
+                paciente?.Cedula,
+                EdadDe(paciente?.FechaNacimiento),
+                indicacion.FechaUtc,
+                medico?.Nombre ?? indicacion.MedicoNombre,
+                medico?.Especialidad,
+                medico?.Exequatur,
+                indicacion.Medicamentos,
+                indicacion.Notas));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error preparando la receta de la indicación {Id}", indicacion.Id);
+            _dialogos.MostrarError("Receta", $"No se pudo preparar la receta.\n\n{ex.Message}");
+        }
+        finally
+        {
+            Ocupado = false;
+        }
+    }
+
+    /// <summary>Años cumplidos a la fecha de negocio. Null si no hay fecha de nacimiento.</summary>
+    private static int? EdadDe(DateOnly? nacimiento)
+    {
+        if (nacimiento is not { } fecha)
+            return null;
+
+        var hoy = FechaNegocio.Hoy;
+        var edad = hoy.Year - fecha.Year;
+        if (fecha.AddYears(edad) > hoy)
+            edad--;
+        return edad < 0 ? null : edad;
+    }
+
     [RelayCommand]
     private async Task GuardarAsync()
     {
+        if (CorrigiendoId is { } enCorreccion)
+        {
+            await GuardarCorreccionAsync(enCorreccion);
+            return;
+        }
+
         if (PacienteSeleccionado?.Valor is not { } clienteId)
         {
             _dialogos.MostrarError("Medicamentos indicados", "Elegí el paciente.");
@@ -232,6 +433,7 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
             Ocupado = true;
             await _indicaciones.CrearAsync(indicacion);
             LimpiarFormulario();
+            await CargarMasUsadosAsync();
             await CargarDelDiaAsync();
         }
         catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException)
@@ -243,6 +445,51 @@ public partial class IndicacionesViewModel : ObservableObject, IPaginaAsincrona
             Log.Error(ex, "Error guardando una indicación");
             _dialogos.MostrarError("Medicamentos indicados",
                 $"No se pudo guardar.\n\n{ex.Message}");
+        }
+        finally
+        {
+            Ocupado = false;
+        }
+    }
+
+    private async Task GuardarCorreccionAsync(long id)
+    {
+        // Se manda la indicación tal como se leyó del día: el servicio necesita
+        // los medicamentos de ANTES para escribirlos en la auditoría.
+        var original = DelDia.FirstOrDefault(i => i.Id == id);
+        if (original is null)
+        {
+            _dialogos.MostrarError("Corregir",
+                "La indicación ya no está en la lista del día. Volvé a cargar la pantalla.");
+            LimpiarFormulario();
+            return;
+        }
+
+        var medicamentos = Renglones.Where(r => !r.EstaVacio).Select(r => r.AModelo()).ToList();
+        if (medicamentos.Count == 0)
+        {
+            _dialogos.MostrarError("Corregir",
+                "Tiene que quedar al menos un medicamento. Si no queda ninguno, " +
+                "lo que corresponde es dar de baja la indicación completa.");
+            return;
+        }
+
+        try
+        {
+            Ocupado = true;
+            await _indicaciones.ActualizarMedicamentosAsync(original, medicamentos);
+            LimpiarFormulario();
+            await CargarMasUsadosAsync();
+            await CargarDelDiaAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException)
+        {
+            _dialogos.MostrarError("Corregir", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error corrigiendo los medicamentos de la indicación {Id}", id);
+            _dialogos.MostrarError("Corregir", $"No se pudo guardar.\n\n{ex.Message}");
         }
         finally
         {

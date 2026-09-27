@@ -18,7 +18,10 @@
               Style="{DynamicResource Boton.Primario}"
               Command="{Binding NuevoCommand}" />
       <StackPanel>
-        <TextBox Style="{DynamicResource Input.Texto}" Width="280" HorizontalAlignment="Left"
+        <!-- MaxWidth y no Width: con la ventana angosta, un ancho fijo se sale
+             del panel y lo tapa el de al lado (2026-09-25). Así encoge. -->
+        <TextBox Style="{DynamicResource Input.Texto}" MaxWidth="280" MinWidth="120"
+                 HorizontalAlignment="Left"
                  Text="{Binding Busqueda, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
         <TextBlock Text="{Binding Resumen}" Style="{DynamicResource Texto.Caption}"
                    Foreground="{DynamicResource Brush.TextoSecundario}" Margin="2,6,0,0" />
@@ -39,6 +42,8 @@
                (pedido 2026-08-14). El ElementStyle apunta al TextBlock de la
                celda; con CellStyle no funcionaría. -->
           <DataGridTextColumn Header="Código" Binding="{Binding CodigoTexto}" Width="Auto" MinWidth="90"
+                              ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
+          <DataGridTextColumn Header="Categoría" Binding="{Binding CategoriaTexto}" Width="Auto" MinWidth="110"
                               ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
           <DataGridTextColumn Header="Procedimiento" Binding="{Binding Nombre}" Width="*" MinWidth="200"
                               ElementStyle="{StaticResource Tabla.Texto.Centrado}" />
@@ -118,6 +123,13 @@
             <TextBlock Text="Código (opcional)" Style="{DynamicResource Input.Label}" Margin="0,12,0,6" />
             <TextBox Style="{DynamicResource Input.Texto}"
                      Text="{Binding Codigo, UpdateSourceTrigger=PropertyChanged}" />
+
+            <!-- Categoría (014): se puede escribir libre o elegir una ya usada -->
+            <TextBlock Text="Categoría (opcional)" Style="{DynamicResource Input.Label}" Margin="0,12,0,6" />
+            <ComboBox IsEditable="True" Height="38" FontSize="13"
+                      ItemsSource="{Binding CategoriasUsadas}"
+                      Text="{Binding Categoria, UpdateSourceTrigger=PropertyChanged}"
+                      ToolTip="Cómo agrupás el procedimiento: Endodoncia, Limpieza, Ortodoncia…" />
 
             <Grid Margin="0,12,0,0">
               <Grid.ColumnDefinitions>
@@ -222,6 +234,14 @@
                 <Button Grid.Column="2" Content="Eliminar" Style="{DynamicResource Boton.Destructivo}"
                         Command="{Binding EliminarCommand}" />
               </Grid>
+
+              <!-- El papel que el paciente firma antes de este procedimiento
+                   (pedido de la clínica 2026-09-21). Se escribe acá porque es
+                   parte del catálogo; se imprime desde la ficha del paciente. -->
+              <Button Content="Consentimiento informado" Margin="0,10,0,0"
+                      Style="{DynamicResource Boton.Secundario}"
+                      Command="{Binding ConsentimientosCommand}"
+                      ToolTip="Ver y escribir los textos de consentimiento de este procedimiento" />
 
               <!-- ===== Agendar este procedimiento =====
                    Los dos combos que pidió Yuber (paciente y médico) van acá,

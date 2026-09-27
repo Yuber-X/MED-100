@@ -13,6 +13,21 @@ namespace MED100.Services;
 public static class CalculosClinica
 {
     /// <summary>
+    /// Lo más que se le puede rebajar a un procedimiento (propuesta de la
+    /// clínica del 2026-09-21: "hacer descuento de un 10%").
+    ///
+    /// Es un TOPE, no un descuento fijo: recepción rebaja lo que acuerde con el
+    /// paciente mientras no pase de acá. Por encima, no hay rebaja: se cambia
+    /// el precio del tarifario, que es una decisión de la clínica y queda
+    /// escrita. Vale para todos, incluido el Admin, para que el número que sale
+    /// en el reporte de descuentos signifique siempre lo mismo.
+    /// </summary>
+    public const decimal TopeDescuento = 0.10m;
+
+    /// <summary>Lo máximo que se puede rebajar en una línea, en pesos.</summary>
+    public static decimal DescuentoMaximo(decimal precioCatalogo, int cantidad) =>
+        Math.Round(precioCatalogo * cantidad * TopeDescuento, 2, MidpointRounding.AwayFromZero);
+    /// <summary>
     /// Totales con ITBIS <b>solo sobre la parte gravada</b>.
     ///
     /// Es LA diferencia con el POS-500, que le cobra 18% a todo. En RD los

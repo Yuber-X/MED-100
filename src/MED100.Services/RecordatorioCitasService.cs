@@ -101,6 +101,42 @@ public class RecordatorioCitasService
         return new ResultadoRecordatorioCitas(enviados, fallidos, 0, detalle);
     }
 
+    /// <summary>
+    /// Manda el recordatorio de UNA cita, la que está elegida en la agenda
+    /// (pedido de la clínica 2026-09-21: el recordatorio "puede ser automático
+    /// programado por el sistema o manual").
+    ///
+    /// No mira la ventana de anticipación: si recepción lo pide a mano es
+    /// porque quiere avisarle a ESE paciente ahora, falten dos días o dos
+    /// semanas. Sí respeta lo demás: que la cita esté viva, que el paciente
+    /// tenga correo, y que no se mande dos veces sin querer.
+    /// </summary>
+    public async Task<string> EnviarUnaAsync(long citaId, bool aunqueYaSeEnvio = false,
+        CancellationToken ct = default)
+    {
+        if (!_email.EstaConfigurado)
+            throw new InvalidOperationException(
+                "El correo no está configurado. Completá la cuenta de Gmail en Configuración.");
+
+        var cita = await _citas.ObtenerPorIdAsync(citaId, ct)
+            ?? throw new InvalidOperationException("La cita ya no existe.");
+
+        if (cita.Estado is EstadoCita.Cancelada or EstadoCita.Atendida or EstadoCita.NoAsistio)
+            throw new InvalidOperationException(
+                $"La cita está {cita.Estado.ToString().ToLowerInvariant()}: no se le manda recordatorio.");
+        if (string.IsNullOrWhiteSpace(cita.PacienteEmail))
+            throw new InvalidOperationException(
+                $"{cita.PacienteNombre} no tiene correo cargado. Agregalo en su ficha y volvé a intentar.");
+        if (cita.RecordatorioEnviadoAtUtc is not null && !aunqueYaSeEnvio)
+            throw new InvalidOperationException(
+                "A esta cita ya se le mandó el recordatorio.");
+
+        await _email.EnviarAsync(cita.PacienteEmail!, Asunto(cita), Cuerpo(cita), ct);
+        await _citas.MarcarRecordatorioEnviadoAsync(cita.Id, ct);
+        Log.Information("Recordatorio manual de la cita {CitaId} enviado a {Correo}", cita.Id, cita.PacienteEmail);
+        return $"Recordatorio enviado a {cita.PacienteNombre} ({cita.PacienteEmail}).";
+    }
+
     /// <summary>Envío automático al abrir el programa, una vez por día.</summary>
     public async Task EjecutarAutomaticoSiTocaAsync()
     {

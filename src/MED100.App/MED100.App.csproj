@@ -24,9 +24,9 @@
        2026-09-05 en FAControl — el asistente diciendo "listo" mientras la
        aplicación seguía siendo la vieja. -->
   <PropertyGroup>
-    <Version>1.3.0</Version>
-    <FileVersion>1.3.0.0</FileVersion>
-    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <Version>1.4.0</Version>
+    <FileVersion>1.4.0.0</FileVersion>
+    <AssemblyVersion>1.4.0.0</AssemblyVersion>
     <Product>Odonto Unión</Product>
     <Company>Yuber Santana</Company>
   </PropertyGroup>

@@ -34,11 +34,11 @@ public static class AppInfo
     public const string Nombre = "Odonto Unión";
 
     /// <summary>Versión del producto. Debe coincidir con el .csproj y el .iss.</summary>
-    public const string Version = "1.3.0";
+    public const string Version = "1.4.0";
 
-    /// <summary>"Odonto Unión 1.3.0" — para encabezados y la ventana Acerca de.</summary>
+    /// <summary>"Odonto Unión 1.4.0" — para encabezados y la ventana Acerca de.</summary>
     public static string NombreYVersion => $"{Nombre} {Version}";
 
-    /// <summary>"Versión 1.3.0" — lo que se muestra abajo en la pantalla de inicio.</summary>
+    /// <summary>"Versión 1.4.0" — lo que se muestra abajo en la pantalla de inicio.</summary>
     public static string EtiquetaVersion => $"Versión {Version}";
 }

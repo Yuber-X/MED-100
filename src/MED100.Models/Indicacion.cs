@@ -37,6 +37,45 @@ public class IndicacionMedicamento
 }
 
 /// <summary>
+/// Todo lo que lleva la receta impresa, ya resuelto (pedido de la clínica
+/// 2026-09-21: <i>"receta timbrada con logo, firma del doctor, exequátur, que
+/// se pueda imprimir"</i>).
+///
+/// Es un DTO y no la <see cref="Indicacion"/> a secas porque el papel necesita
+/// datos que la indicación no guarda: la cédula y la edad del paciente, y el
+/// exequátur del médico. Se arman una vez al imprimir en vez de que el
+/// documento salga a buscarlos: así lo que se imprime es exactamente lo que se
+/// le pasó, y se puede revisar sin una impresora.
+/// </summary>
+public record RecetaImpresa(
+    string PacienteNombre,
+    string? PacienteCedula,
+    /// <summary>Años cumplidos. Va en la receta porque la dosis depende de la edad.</summary>
+    int? PacienteEdad,
+    DateTime FechaUtc,
+    string? MedicoNombre,
+    string? MedicoEspecialidad,
+    string? MedicoExequatur,
+    IReadOnlyList<IndicacionMedicamento> Medicamentos,
+    string? Notas);
+
+/// <summary>
+/// Un medicamento del listado de "los que más se usan" (pedido de la clínica
+/// 2026-09-21: <i>"un listado de los medicamentos que más se usen para
+/// elegirlo"</i>).
+///
+/// No es un catálogo que alguien mantenga: sale del historial. La lista se
+/// arma sola con lo que de verdad receta esta clínica, y trae la dosis y la
+/// frecuencia de la última vez para no volver a tipearlas.
+/// </summary>
+public record MedicamentoFrecuente(
+    string Medicamento,
+    int Veces,
+    string? Dosis,
+    string? Frecuencia,
+    string? Duracion);
+
+/// <summary>
 /// Lo que el médico le indicó a un paciente en una visita (013).
 ///
 /// ⚠ Es contenido clínico y por eso vive acotado: se anota QUÉ se mandó a

@@ -12,7 +12,7 @@ public class ProcedimientoRepository
     public ProcedimientoRepository(ConexionFactory factory) => _factory = factory;
 
     private const string ColumnasBase =
-        "id, codigo, nombre, precio, duracion_minutos, exento_itbis, descripcion, " +
+        "id, codigo, categoria, nombre, precio, duracion_minutos, exento_itbis, descripcion, " +
         "activo, created_at, updated_at";
 
     /// <summary>Todos los vigentes, activos e inactivos (la UI los distingue).</summary>
@@ -74,9 +74,9 @@ public class ProcedimientoRepository
         using var cmd = conexion.CreateCommand();
         cmd.CommandText = $"""
             INSERT INTO {DbNames.Procedimiento}
-              (codigo, nombre, precio, duracion_minutos, exento_itbis, descripcion, activo)
+              (codigo, categoria, nombre, precio, duracion_minutos, exento_itbis, descripcion, activo)
             VALUES
-              (@codigo, @nombre, @precio, @duracion, @exento, @descripcion, @activo);
+              (@codigo, @categoria, @nombre, @precio, @duracion, @exento, @descripcion, @activo);
             SELECT LAST_INSERT_ID();
             """;
         AgregarParametros(cmd, datos);
@@ -89,7 +89,7 @@ public class ProcedimientoRepository
         using var cmd = conexion.CreateCommand();
         cmd.CommandText = $"""
             UPDATE {DbNames.Procedimiento}
-            SET codigo = @codigo, nombre = @nombre, precio = @precio,
+            SET codigo = @codigo, categoria = @categoria, nombre = @nombre, precio = @precio,
                 duracion_minutos = @duracion, exento_itbis = @exento,
                 descripcion = @descripcion, activo = @activo,
                 updated_at = UTC_TIMESTAMP()
@@ -149,6 +149,7 @@ public class ProcedimientoRepository
     {
         Id = reader.GetInt64("id"),
         Codigo = reader.IsDBNull(reader.GetOrdinal("codigo")) ? null : reader.GetString("codigo"),
+        Categoria = reader.IsDBNull(reader.GetOrdinal("categoria")) ? null : reader.GetString("categoria"),
         Nombre = reader.GetString("nombre"),
         Precio = reader.GetDecimal("precio"),
         DuracionMinutos = reader.GetInt32("duracion_minutos"),
@@ -164,6 +165,7 @@ public class ProcedimientoRepository
     private static void AgregarParametros(MySqlCommand cmd, ProcedimientoDatos datos)
     {
         cmd.Parameters.AddWithValue("@codigo", (object?)datos.Codigo ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@categoria", (object?)datos.Categoria ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@nombre", datos.Nombre);
         cmd.Parameters.AddWithValue("@precio", datos.Precio);
         cmd.Parameters.AddWithValue("@duracion", datos.DuracionMinutos);

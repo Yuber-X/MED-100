@@ -232,7 +232,11 @@
                   <DataGridTemplateColumn Header="Estado" Width="110">
                     <DataGridTemplateColumn.CellTemplate>
                       <DataTemplate>
-                        <TextBlock FontSize="12" VerticalAlignment="Center">
+                        <!-- Centrado para que caiga justo debajo del encabezado,
+                             que ya viene centrado por Tabla.Encabezado
+                             (pedido 2026-09-26). -->
+                        <TextBlock FontSize="12" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center">
                           <TextBlock.Style>
                             <Style TargetType="TextBlock">
                               <Setter Property="Text" Value="Inactiva" />
@@ -251,10 +255,15 @@
                   </DataGridTemplateColumn>
                   <!-- No hay "eliminar": una ARS con facturas tiene que seguir
                        teniendo nombre cuando se reimprima el comprobante -->
-                  <DataGridTemplateColumn Width="140">
+                  <!-- Width="Auto": con 140 fijos el botón salía cortado
+                       ("Activar / desactiv", reportado 2026-09-26). Auto mide
+                       el contenido real, así que no depende de que alguien
+                       acierte el número. -->
+                  <DataGridTemplateColumn Width="Auto" MinWidth="170">
                     <DataGridTemplateColumn.CellTemplate>
                       <DataTemplate>
                         <Button Content="Activar / desactivar" Style="{DynamicResource Boton.Terciario}"
+                                HorizontalAlignment="Center"
                                 Command="{Binding DataContext.AlternarArsCommand,
                                           RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                 CommandParameter="{Binding}" />

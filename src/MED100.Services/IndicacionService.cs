@@ -52,6 +52,18 @@ public class IndicacionService
         return _indicaciones.ObtenerDeClienteAsync(clienteId, ct);
     }
 
+    /// <summary>
+    /// Los medicamentos que más se indican, para elegirlos en vez de tipearlos
+    /// (pedido de la clínica 2026-09-21). Pasa por el mismo permiso que todo lo
+    /// demás: la lista sale del historial de pacientes reales.
+    /// </summary>
+    public Task<IReadOnlyList<MedicamentoFrecuente>> ObtenerMasUsadosAsync(int tope = 30,
+        CancellationToken ct = default)
+    {
+        ExigirPermiso();
+        return _indicaciones.ObtenerMasUsadosAsync(tope, ct);
+    }
+
     public async Task<long> CrearAsync(Indicacion indicacion, CancellationToken ct = default)
     {
         ExigirPermiso();
@@ -85,6 +97,57 @@ public class IndicacionService
         Log.Information("Indicación {Id} registrada para el cliente {ClienteId} ({Cantidad} medicamentos)",
             id, indicacion.ClienteId, indicacion.Medicamentos.Count);
         return id;
+    }
+
+    /// <summary>
+    /// Corrige los medicamentos de una indicación ya guardada: quitar uno,
+    /// arreglar una dosis o agregar el que faltó (pedido de la clínica
+    /// 2026-09-21: <i>"la opción de poder quitar o modificar medicamentos una
+    /// vez agregado, es decir si deseo quitar solo uno de la lista"</i>).
+    ///
+    /// Lo de HOY lo corrige quien lo carga: es el renglón que se acaba de
+    /// tipear mal, y obligar a llamar al Admin para eso llevaría a no
+    /// corregirlo. Lo de días anteriores ya es reescribir historial y queda
+    /// para el Admin, igual que dar de baja.
+    ///
+    /// La auditoría guarda el ANTES y el DESPUÉS con los nombres. Sin eso, una
+    /// corrección legítima sería indistinguible de borrar lo que molestaba.
+    /// </summary>
+    public async Task ActualizarMedicamentosAsync(Indicacion indicacion,
+        IReadOnlyList<IndicacionMedicamento> nuevos, CancellationToken ct = default)
+    {
+        ExigirPermiso();
+
+        var limpios = nuevos
+            .Where(m => !string.IsNullOrWhiteSpace(m.Medicamento))
+            .ToList();
+
+        if (limpios.Count == 0)
+            throw new ArgumentException(
+                "Tiene que quedar al menos un medicamento. Si no queda ninguno, " +
+                "lo que corresponde es dar de baja la indicación completa.");
+
+        var dia = DateOnly.FromDateTime(FechaNegocio.AUtcLocal(indicacion.FechaUtc));
+        if (dia != FechaNegocio.Hoy && !SesionActual.EsAdmin)
+            throw new UnauthorizedAccessException(
+                "Esta indicación no es de hoy: solo un administrador puede corregirla.");
+
+        var antes = Resumir(indicacion.Medicamentos);
+        await _indicaciones.ReemplazarMedicamentosAsync(indicacion.Id, limpios, ct);
+        var ahora = Resumir(limpios);
+
+        await _auditoria.RegistrarAsync(AccionAuditoria.Modificar, DbNames.Indicacion, indicacion.Id,
+            $"Medicamentos corregidos a {indicacion.ClienteNombre}. " +
+            $"Antes: {antes}. Ahora: {ahora}", ct);
+
+        Log.Information("Indicación {Id} corregida ({Antes} -> {Ahora})",
+            indicacion.Id, antes, ahora);
+    }
+
+    private static string Resumir(IEnumerable<IndicacionMedicamento> medicamentos)
+    {
+        var texto = string.Join("; ", medicamentos.Select(m => m.Resumen));
+        return string.IsNullOrWhiteSpace(texto) ? "(nada)" : texto;
     }
 
     /// <summary>

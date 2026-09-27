@@ -284,6 +284,25 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
     /// <summary>Cuántos pacientes se ofrecen de una en el combo.</summary>
     private const int TopePacientes = 50;
 
+    /// <summary>
+    /// Todos los pacientes registrados. Lo usa el buscador grande de la vista
+    /// (pedido de la clínica 2026-09-21): el combo del formulario muestra los
+    /// primeros <see cref="TopePacientes"/> y con la cartera llena no alcanza.
+    /// </summary>
+    public IReadOnlyList<Cliente> TodosLosPacientes => _todosLosPacientes;
+
+    /// <summary>
+    /// Deja elegido el paciente que vino del buscador grande. Pasa por la
+    /// búsqueda para que el combo lo contenga: un SelectedItem que no está en
+    /// la lista no se ve.
+    /// </summary>
+    public void ElegirPaciente(Cliente paciente)
+    {
+        BusquedaPaciente = paciente.Nombre;
+        FiltrarPacientes();
+        PacienteSeleccionado = PacientesSugeridos.FirstOrDefault(p => p.Id == paciente.Id);
+    }
+
     private void FiltrarPacientes()
     {
         var filtro = BusquedaPaciente.Trim();
@@ -718,6 +737,44 @@ public partial class CitasViewModel : ObservableObject, IPaginaAsincrona
     }
 
     /// <summary>Manda los recordatorios pendientes a pedido, sin esperar al automático.</summary>
+    /// <summary>
+    /// Recordatorio a mano de la cita elegida (2026-09-21). El botón grande de
+    /// arriba manda la tanda del día; este es para "avisale a esta señora".
+    /// </summary>
+    [RelayCommand]
+    private async Task EnviarRecordatorioDeLaCitaAsync()
+    {
+        if (Seleccionada is not { } fila)
+            return;
+
+        var yaSeEnvio = fila.Cita.RecordatorioEnviadoAtUtc is not null;
+        if (yaSeEnvio && !_dialogos.Confirmar("Enviar recordatorio",
+                $"A {fila.Cita.PacienteNombre} ya se le mandó el recordatorio de esta cita.\n\n" +
+                "¿Mandarlo otra vez?"))
+            return;
+
+        try
+        {
+            Ocupado = true;
+            var detalle = await _recordatorios.EnviarUnaAsync(fila.Cita.Id, aunqueYaSeEnvio: yaSeEnvio);
+            _dialogos.Informar("Recordatorio", detalle);
+            await RefrescarAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _dialogos.MostrarError("Recordatorio", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error enviando el recordatorio de la cita {CitaId}", fila.Cita.Id);
+            _dialogos.MostrarError("Recordatorio", $"No se pudo enviar.\n\n{ex.Message}");
+        }
+        finally
+        {
+            Ocupado = false;
+        }
+    }
+
     [RelayCommand]
     private async Task EnviarRecordatoriosAsync()
     {

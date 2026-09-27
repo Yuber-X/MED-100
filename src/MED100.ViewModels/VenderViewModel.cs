@@ -41,6 +41,7 @@ public partial class CarritoLinea : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Subtotal))]
+    [NotifyPropertyChangedFor(nameof(PasaDelTope))]
     private int _cantidad = 1;
 
     /// <summary>
@@ -53,6 +54,7 @@ public partial class CarritoLinea : ObservableObject
     [NotifyPropertyChangedFor(nameof(Subtotal))]
     [NotifyPropertyChangedFor(nameof(Rebajado))]
     [NotifyPropertyChangedFor(nameof(DescuentoTexto))]
+    [NotifyPropertyChangedFor(nameof(PasaDelTope))]
     private decimal _precio;
 
     public decimal Subtotal => Cantidad * Precio;
@@ -62,10 +64,21 @@ public partial class CarritoLinea : ObservableObject
     /// <summary>Se le tocó el precio hacia abajo. Se marca en pantalla.</summary>
     public bool Rebajado => Precio < PrecioCatalogo;
 
+    /// <summary>
+    /// La rebaja pasó del tope permitido (10%, 2026-09-21). La pantalla lo
+    /// marca en rojo y el cobro no deja seguir; la regla de verdad está en
+    /// VentaService, que es por donde pasa todo cobro.
+    /// </summary>
+    public bool PasaDelTope =>
+        Rebajado && (PrecioCatalogo - Precio) * Cantidad >
+                    CalculosClinica.DescuentoMaximo(PrecioCatalogo, Cantidad);
+
     /// <summary>Lo que se le rebajó a esta línea, para mostrar debajo del precio.</summary>
-    public string DescuentoTexto => Rebajado
-        ? $"antes {PrecioCatalogo.ToString("N2", CultureInfo.GetCultureInfo("es-DO"))}"
-        : string.Empty;
+    public string DescuentoTexto => PasaDelTope
+        ? $"pasa del {CalculosClinica.TopeDescuento:P0} permitido"
+        : Rebajado
+            ? $"antes {PrecioCatalogo.ToString("N2", CultureInfo.GetCultureInfo("es-DO"))}"
+            : string.Empty;
 }
 
 /// <summary>
@@ -353,6 +366,29 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         Recalcular();
     }
 
+    /// <summary>
+    /// Empieza un cobro con el paciente ya elegido, desde su ficha (pedido de
+    /// la clínica 2026-09-21: "DESDE EL PACIENTE YO PUEDO AGREGAR
+    /// PROCEDIMIENTO, HACER DESCUENTO, COBRAR PROCEDIMIENTO").
+    ///
+    /// Se manda a la pantalla de Cobrar en vez de armar un cobro aparte en la
+    /// ficha: acá ya viven la rebaja con su tope, el candado del médico, la
+    /// ARS, el fiado, el comprobante fiscal y el ticket. Dos cobros distintos
+    /// serían dos reglas distintas.
+    /// </summary>
+    public async Task PrepararDesdePacienteAsync(long clienteId, string nombrePaciente)
+    {
+        await RefrescarAsync();
+
+        Carrito.Clear();
+        _citaId = null;
+        ClienteSeleccionado = Clientes.FirstOrDefault(c => c.Valor == clienteId)
+                              ?? Clientes.FirstOrDefault();
+        AvisoCita = $"Cobrando a {nombrePaciente}. Buscá el procedimiento y agregalo.";
+        OnPropertyChanged(nameof(HayCitaEnCobro));
+        Recalcular();
+    }
+
     private static ResultadoCobro DeProcedimiento(Procedimiento p) =>
         new(p.Id, p.Nombre, p.Precio, EsProcedimiento: true, p.ExentoItbis, Stock: int.MaxValue);
 
@@ -562,6 +598,25 @@ public partial class VenderViewModel : ObservableObject, IPaginaAsincrona
         if (Carrito.Count == 0)
         {
             _dialogos.MostrarError("Cobrar", "No hay nada que cobrar.");
+            return;
+        }
+
+        // Candado del médico (2026-09-21): un procedimiento sin doctor no pasa.
+        if (MedicoObligatorio && MedicoSeleccionado?.Valor is null)
+        {
+            _dialogos.MostrarError("Cobrar",
+                "Elegí el médico que hizo el procedimiento.\n\n" +
+                "Sin doctor asignado no se puede cobrar: de ahí salen su honorario y " +
+                "los reportes por médico.");
+            return;
+        }
+
+        if (Carrito.FirstOrDefault(l => l.PasaDelTope) is { } pasada)
+        {
+            _dialogos.MostrarError("Cobrar",
+                $"«{pasada.Nombre}»: la rebaja pasa del {CalculosClinica.TopeDescuento:P0} permitido.\n\n" +
+                $"Lo más que se puede rebajar es {CalculosClinica.DescuentoMaximo(pasada.PrecioCatalogo, pasada.Cantidad):N2} " +
+                "sobre el precio del tarifario. Si hay que cobrar menos, se cambia el precio en Procedimientos.");
             return;
         }
 

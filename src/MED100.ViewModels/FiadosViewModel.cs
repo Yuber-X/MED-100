@@ -96,6 +96,12 @@ public partial class FiadosViewModel : ObservableObject, IPaginaAsincrona
     public int CantidadAtrasados =>
         Fiados.Count(f => f.Semaforo is SemaforoFiado.Vencido or SemaforoFiado.EnMora);
 
+    /// <summary>
+    /// Para el aviso de lista vacía. Distingue "no hay nada fiado" de "la
+    /// pantalla no cargó", que con una tabla en blanco se ven igual.
+    /// </summary>
+    public bool HayFiados => Fiados.Count > 0;
+
     partial void OnTextoBusquedaChanged(string value) => Filtrar();
     partial void OnSoloAtrasadosChanged(bool value) => Filtrar();
 
@@ -159,6 +165,7 @@ public partial class FiadosViewModel : ObservableObject, IPaginaAsincrona
 
         OnPropertyChanged(nameof(TotalPendienteTexto));
         OnPropertyChanged(nameof(CantidadAtrasados));
+        OnPropertyChanged(nameof(HayFiados));
     }
 
     [RelayCommand]

@@ -1,4 +1,4 @@
-# CLAUDE.md — MED-100
+﻿# CLAUDE.md — MED-100
 
 > Guía de proyecto para Claude Code. Define el alcance, la arquitectura y las reglas de **MED-100**, la app de recepción para una clínica. Nace como copia del **POS-500** (2026-08-10) y hereda su arquitectura entera. Se complementa con el `CLAUDE.md` global de freelance y con el `DESIGN.md`.
 
@@ -611,6 +611,40 @@ script tarda un segundo; correrlo antes de entregar es obligatorio.
 Lo que el script **no** cubre y sigue exigiendo abrir la pantalla: que el
 `TargetType` de un estilo case con el elemento al que se aplica, y los estilos
 implícitos (`{x:Type …}`).
+
+### Tampoco se ve solo lo que queda CORTADO: correr el verificador de desborde
+
+```powershell
+dotnet run --project scripts/verificar_desborde
+```
+
+Arma las 22 pantallas a los anchos reales del shell (incluido el tamaño de
+texto Grande, que deja 20% menos de ancho útil) y marca todo lo que se dibuja
+fuera de su contenedor. Existe por el reporte de la clínica del 2026-09-25
+—*"en cita el mes no se ve bien"*—: una barra de botones armada con columnas
+`Auto` se dibuja a su tamaño aunque no quepa, se sale del panel y la tapa la
+tarjeta de al lado. Compila, no avisa, y en la clínica falta medio control.
+
+Arreglo habitual: `WrapPanel` para las barras de botones y `MaxWidth` en vez de
+`Width` en los buscadores. El piso de ancho lo garantiza
+`MainWindow.MinWidth` (1024, y proporcionalmente más con el texto grande).
+
+### Ni lo que se liga TwoWay sin querer: correr el verificador de bindings
+
+```powershell
+python scripts/verificar_bindings_solo_lectura.py
+```
+
+WPF liga **TwoWay por defecto** varias propiedades —`TextBox.Text`,
+`ComboBox.SelectedItem`, `CheckBox.IsChecked`, `DatePicker.SelectedDate` y
+`DisplayDateStart`/`DisplayDateEnd`—. Si el ViewModel expone esa propiedad de
+solo lectura (`=>` o `{ get; }`), WPF tira al aplicar el binding:
+
+> A TwoWay or OneWayToSource binding cannot work on the read-only property
+> 'PrimerDiaAgendable' of type 'MED100.ViewModels.CitasViewModel'.
+
+Compila sin advertencias y revienta al abrir la pantalla. Le salió al cliente
+en Citas el 2026-09-26. El arreglo es `Mode=OneWay` explícito.
 
 ---
 

@@ -265,6 +265,12 @@ public partial class App : Application
         turnos.ImpresionSolicitada += (turno, etiqueta, directo) =>
             ImprimirTurno(turno, etiqueta, directo);
 
+        // Receta: SIEMPRE con vista previa. Se imprime en hoja carta y sale de
+        // la impresora normal, no de la térmica del mostrador, así que quien la
+        // emite tiene que poder elegir la impresora y ver qué va a salir.
+        var indicaciones = _servicios.GetRequiredService<IndicacionesViewModel>();
+        indicaciones.RecetaSolicitada += receta => MostrarReceta(receta);
+
         // Cuadre: el cierre SIEMPRE se previsualiza antes de imprimir
         var cuadre = _servicios.GetRequiredService<CuadreViewModel>();
         cuadre.ImpresionSolicitada += (cierre, tamano) => MostrarCierre(cierre, tamano);
@@ -316,6 +322,27 @@ public partial class App : Application
         });
         // Ficha → agenda: la cita se pone con el paciente ya elegido, sin
         // volver a buscarlo (pedido de la clínica 2026-08-27).
+        // Ficha → caja: cobrarle un procedimiento sin buscarlo otra vez
+        // (pedido de la clínica 2026-09-21).
+        pacienteFicha.CobroSolicitado += (id, nombre) => _ = AbrirEdicionAsync(async () =>
+        {
+            await vender.PrepararDesdePacienteAsync(id, nombre);
+            main.VolverA(Pagina.Vender);
+        });
+        // Consentimiento informado (2026-09-21). Dos puertas a la MISMA lista:
+        // desde la ficha del paciente, para imprimir el papel que va a firmar;
+        // desde Procedimientos, para escribir y corregir los textos.
+        pacienteFicha.ConsentimientoSolicitado += id => _ = AbrirEdicionAsync(async () =>
+        {
+            var paciente = await _servicios.GetRequiredService<ClienteService>().ObtenerPorIdAsync(id);
+            if (paciente is not null)
+                AbrirConsentimientos(paciente, procedimientoId: null);
+        });
+
+        var procedimientos = _servicios.GetRequiredService<ProcedimientosViewModel>();
+        procedimientos.ConsentimientosSolicitados += procedimientoId =>
+            AbrirConsentimientos(paciente: null, procedimientoId);
+
         pacienteFicha.CitaSolicitada += id => _ = AbrirEdicionAsync(async () =>
         {
             // Primero se arma el formulario y DESPUÉS se navega: Navegar dispara
@@ -567,6 +594,84 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// Abre la lista de consentimientos informados. Con paciente, para
+    /// imprimirle uno; sin paciente, para escribir los textos.
+    /// </summary>
+    private void AbrirConsentimientos(MED100.Models.Cliente? paciente, long? procedimientoId)
+    {
+        try
+        {
+            var vm = _servicios.GetRequiredService<ConsentimientosViewModel>();
+            vm.ImpresionSolicitada += MostrarConsentimiento;
+
+            var ventana = new ConsentimientosWindow(vm) { Owner = MainWindow };
+            _ = vm.CargarAsync(paciente, procedimientoId);
+            ventana.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error abriendo los consentimientos");
+            MessageBox.Show($"No se pudo abrir los consentimientos.\n\n{ex.Message}",
+                AppInfo.Nombre, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
+    /// Vista previa del consentimiento. Va por FlowDocument y no por visual:
+    /// es un texto legal de largo impredecible y tiene que PAGINAR en vez de
+    /// cortarse al llegar al pie de la hoja.
+    /// </summary>
+    private void MostrarConsentimiento(MED100.Models.ConsentimientoImpreso consentimiento)
+    {
+        try
+        {
+            var negocio = _servicios.GetRequiredService<ConfiguracionNegocioService>().Actual;
+
+            new VistaPreviaDocumentoWindow(
+                () => MED100.Printing.ConsentimientoDocumentFactory.Crear(consentimiento, negocio),
+                $"Consentimiento — {consentimiento.PacienteNombre}",
+                $"Consentimiento {consentimiento.PacienteNombre}")
+            {
+                Owner = MainWindow
+            }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error generando el consentimiento de {Paciente}",
+                consentimiento.PacienteNombre);
+            MessageBox.Show($"No se pudo generar el documento.\n\n{ex.Message}", AppInfo.Nombre,
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
+    /// Vista previa de la receta en hoja carta (pedido de la clínica
+    /// 2026-09-21). Si falla no se pierde nada: lo indicado ya está guardado y
+    /// la receta se vuelve a imprimir desde la misma pantalla.
+    /// </summary>
+    private void MostrarReceta(MED100.Models.RecetaImpresa receta)
+    {
+        try
+        {
+            var negocio = _servicios.GetRequiredService<ConfiguracionNegocioService>().Actual;
+            var visual = MED100.Printing.RecetaVisualFactory.Crear(receta, negocio);
+
+            new VistaPreviaWindow(visual,
+                $"Receta — {receta.PacienteNombre}",
+                $"Receta {receta.PacienteNombre}")
+            {
+                Owner = MainWindow
+            }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error generando la receta de {Paciente}", receta.PacienteNombre);
+            MessageBox.Show($"No se pudo generar la receta.\n\n{ex.Message}", AppInfo.Nombre,
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
     /// Vista previa imprimible del cierre de caja. A diferencia del ticket de
     /// venta, el cierre SIEMPRE se muestra antes de imprimir (pedido de Yuber)
     /// y respeta el tamaño de papel elegido (80mm o carta).
@@ -682,9 +787,18 @@ public partial class App : Application
                     return true;
 
                 case EstadoBaseDatos.CredencialesInvalidas:
+                    // La cadena de ejemplo del repositorio se distingue del
+                    // caso real: el mensaje genérico manda a revisar un archivo
+                    // donde, a primera vista, no se ve nada mal.
                     MessageBox.Show(
-                        "MySQL rechazó el usuario o la contraseña configurados.\n\n" +
-                        "Revisa la cadena de conexión en MED100.App.dll.config.",
+                        _servicios.GetRequiredService<ConexionFactory>().EsCadenaDeEjemplo
+                            ? "La cadena de conexión todavía tiene los valores de ejemplo " +
+                              "(CAMBIAR_USUARIO / CAMBIAR_PASSWORD).\n\n" +
+                              "Poné el usuario y la contraseña de MySQL en " +
+                              "MED100.App.dll.config, o definí la variable de entorno " +
+                              $"{ConexionFactory.VariableDeEntorno} con la cadena completa."
+                            : "MySQL rechazó el usuario o la contraseña configurados.\n\n" +
+                              "Revisa la cadena de conexión en MED100.App.dll.config.",
                         titulo, MessageBoxButton.OK, MessageBoxImage.Error);
                     return false;
 
@@ -766,6 +880,7 @@ public partial class App : Application
         servicios.AddSingleton<NcfRepository>();
         servicios.AddSingleton<FiadoRepository>();
         servicios.AddSingleton<IndicacionRepository>();
+        servicios.AddSingleton<ConsentimientoRepository>();
         servicios.AddSingleton<ConfiguracionNegocioRepository>();
         servicios.AddSingleton<CuadreRepository>();
         servicios.AddSingleton<AnaliticaRepository>();
@@ -789,6 +904,7 @@ public partial class App : Application
         servicios.AddSingleton<NcfService>();
         servicios.AddSingleton<FiadoService>();
         servicios.AddSingleton<IndicacionService>();
+        servicios.AddSingleton<ConsentimientoService>();
         servicios.AddSingleton<VentaService>();
         servicios.AddSingleton<FacturaService>();
         servicios.AddSingleton<CuadreService>();
@@ -808,6 +924,10 @@ public partial class App : Application
 
         // ViewModels
         servicios.AddTransient<LoginViewModel>();   // nueva en cada login (cambio de usuario)
+        // Consentimientos: una por ventana. Es la única pantalla que se abre a
+        // veces para un paciente y a veces para el catálogo; una instancia viva
+        // arrastraría el paciente anterior y la suscripción de la impresión.
+        servicios.AddTransient<ConsentimientosViewModel>();
         servicios.AddSingleton<MainViewModel>();
         servicios.AddSingleton<ClientesViewModel>();
         servicios.AddSingleton<ClienteFormViewModel>();

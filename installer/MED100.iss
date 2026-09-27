@@ -13,7 +13,7 @@
 
 ; El nombre VISIBLE del producto (2026-09-06). "MED-100" era el provisional.
 #define AppNombre "Odonto Unión"
-#define AppVersion "1.3.0"
+#define AppVersion "1.4.0"
 
 ; ⚠ LA CARPETA DE DATOS NO CAMBIA CON EL NOMBRE. Ahi vive licencia.dat, el
 ; ancla que recuerda desde cuando corre el demo de 15 dias. Si se renombrara,

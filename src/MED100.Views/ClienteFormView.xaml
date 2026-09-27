@@ -22,9 +22,22 @@
           </Grid.ColumnDefinitions>
           <StackPanel Grid.Column="0">
             <TextBlock Text="Cédula (opcional)" Style="{DynamicResource Input.Label}" />
-            <TextBox Style="{DynamicResource Input.Texto}"
-                     Text="{Binding Cedula, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="001-1234567-8 (o pasaporte). Puede quedar vacía." />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Grid.Column="0" Style="{DynamicResource Input.Texto}"
+                       Text="{Binding Cedula, UpdateSourceTrigger=PropertyChanged}"
+                       ToolTip="001-1234567-8 (o pasaporte). Puede quedar vacía." />
+              <!-- Lector USB, cámara o foto (pedido de la clínica 2026-09-21).
+                   Lo leído se muestra antes de tocar la ficha. -->
+              <Button Grid.Column="2" Content="Escanear" MinWidth="96"
+                      Style="{DynamicResource Boton.Secundario}"
+                      Click="Escanear_Click"
+                      ToolTip="Leer la cédula con el lector USB, la cámara o una foto" />
+            </Grid>
           </StackPanel>
           <StackPanel Grid.Column="2">
             <TextBlock Text="Teléfono" Style="{DynamicResource Input.Label}" />
@@ -98,8 +111,12 @@
              hoy y viene hoy, el sistema la deduce solo. -->
         <TextBlock Text="Última visita (antes del sistema)" Style="{DynamicResource Input.Label}"
                    Margin="0,18,0,6" />
+        <!-- Mode=OneWay OBLIGATORIO: DisplayDateEnd es TwoWay por defecto y
+             UltimoDiaVisitable es de solo lectura. Es el mismo defecto que en
+             Citas reventó al abrir "Nueva cita" el 2026-09-26. Lo busca
+             scripts/verificar_bindings_solo_lectura.py. -->
         <DatePicker SelectedDate="{Binding UltimaVisitaPrevia, Mode=TwoWay}"
-                    DisplayDateEnd="{Binding UltimoDiaVisitable}" />
+                    DisplayDateEnd="{Binding UltimoDiaVisitable, Mode=OneWay}" />
         <TextBlock TextWrapping="Wrap" Margin="2,4,0,0"
                    Style="{DynamicResource Texto.Caption}"
                    Foreground="{DynamicResource Brush.TextoTerciario}"

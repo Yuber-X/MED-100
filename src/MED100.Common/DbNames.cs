@@ -45,4 +45,11 @@ public static class DbNames
     /// </summary>
     public const string Indicacion = "indicacion";
     public const string IndicacionMedicamento = "indicacion_medicamento";
+
+    /// <summary>
+    /// Catálogo de textos de consentimiento informado (015). Es la PLANTILLA,
+    /// no el consentimiento firmado: el firmado es el papel escaneado en el
+    /// expediente del paciente.
+    /// </summary>
+    public const string Consentimiento = "consentimiento";
 }

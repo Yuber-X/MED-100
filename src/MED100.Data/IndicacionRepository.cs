@@ -125,6 +125,119 @@ public class IndicacionRepository
         }
     }
 
+    /// <summary>
+    /// Los medicamentos que la clínica más indica, con la dosis y la frecuencia
+    /// de la última vez (pedido 2026-09-21).
+    ///
+    /// Sale del historial y no de un catálogo aparte: así la lista se mantiene
+    /// sola. La subconsulta agrupa por nombre para contar, y el JOIN de vuelta
+    /// trae los datos del renglón MÁS NUEVO de cada medicamento — que es el que
+    /// conviene proponer cuando la dosis habitual cambió.
+    /// </summary>
+    public async Task<IReadOnlyList<MedicamentoFrecuente>> ObtenerMasUsadosAsync(
+        int tope = 30, CancellationToken ct = default)
+    {
+        using var conexion = await _factory.AbrirAsync(ct);
+        using var cmd = conexion.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT u.medicamento, u.veces, m.dosis, m.frecuencia, m.duracion
+            FROM (
+                SELECT x.medicamento, COUNT(*) AS veces, MAX(x.id) AS ultimo_id
+                FROM {DbNames.IndicacionMedicamento} x
+                JOIN {DbNames.Indicacion} i
+                  ON i.id = x.indicacion_id AND i.deleted_at IS NULL
+                GROUP BY x.medicamento
+            ) u
+            JOIN {DbNames.IndicacionMedicamento} m ON m.id = u.ultimo_id
+            ORDER BY u.veces DESC, u.medicamento
+            LIMIT @tope;
+            """;
+        cmd.Parameters.AddWithValue("@tope", tope);
+
+        var lista = new List<MedicamentoFrecuente>();
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            lista.Add(new MedicamentoFrecuente(
+                reader.GetString("medicamento"),
+                reader.GetInt32("veces"),
+                Texto(reader, "dosis"),
+                Texto(reader, "frecuencia"),
+                Texto(reader, "duracion")));
+        }
+        return lista;
+
+        static string? Texto(MySqlDataReader lector, string columna)
+        {
+            var valor = lector.IsDBNull(lector.GetOrdinal(columna))
+                ? null : lector.GetString(columna);
+            return string.IsNullOrWhiteSpace(valor) ? null : valor;
+        }
+    }
+
+    /// <summary>
+    /// Reescribe los medicamentos de una indicación ya guardada (pedido
+    /// 2026-09-21: poder quitar o corregir uno solo de la lista).
+    ///
+    /// Se borran los renglones y se vuelven a escribir en UNA transacción: son
+    /// de una sola indicación y valen juntos. Lo que había antes no se pierde
+    /// —la auditoría lo guarda nombre por nombre, la escribe el servicio—, y
+    /// por eso acá sí se borra de verdad: un renglón corregido tres veces
+    /// dejaría tres filas muertas que nadie sabe leer.
+    /// </summary>
+    public async Task ReemplazarMedicamentosAsync(long indicacionId,
+        IReadOnlyList<IndicacionMedicamento> medicamentos, CancellationToken ct = default)
+    {
+        using var conexion = await _factory.AbrirAsync(ct);
+        using var transaccion = await conexion.BeginTransactionAsync(ct);
+        try
+        {
+            using (var borrar = conexion.CreateCommand())
+            {
+                borrar.Transaction = transaccion;
+                borrar.CommandText =
+                    $"DELETE FROM {DbNames.IndicacionMedicamento} WHERE indicacion_id = @id;";
+                borrar.Parameters.AddWithValue("@id", indicacionId);
+                await borrar.ExecuteNonQueryAsync(ct);
+            }
+
+            foreach (var m in medicamentos)
+            {
+                using var cmd = conexion.CreateCommand();
+                cmd.Transaction = transaccion;
+                cmd.CommandText = $"""
+                    INSERT INTO {DbNames.IndicacionMedicamento}
+                      (indicacion_id, medicamento, dosis, frecuencia, duracion, instrucciones)
+                    VALUES
+                      (@id, @medicamento, @dosis, @frecuencia, @duracion, @instrucciones);
+                    """;
+                cmd.Parameters.AddWithValue("@id", indicacionId);
+                cmd.Parameters.AddWithValue("@medicamento", m.Medicamento.Trim());
+                cmd.Parameters.AddWithValue("@dosis", Opcional(m.Dosis));
+                cmd.Parameters.AddWithValue("@frecuencia", Opcional(m.Frecuencia));
+                cmd.Parameters.AddWithValue("@duracion", Opcional(m.Duracion));
+                cmd.Parameters.AddWithValue("@instrucciones", Opcional(m.Instrucciones));
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+
+            using (var tocar = conexion.CreateCommand())
+            {
+                tocar.Transaction = transaccion;
+                tocar.CommandText =
+                    $"UPDATE {DbNames.Indicacion} SET updated_at = UTC_TIMESTAMP() WHERE id = @id;";
+                tocar.Parameters.AddWithValue("@id", indicacionId);
+                await tocar.ExecuteNonQueryAsync(ct);
+            }
+
+            await transaccion.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaccion.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
     /// <summary>Soft delete. El renglón sigue en la base para poder auditarlo.</summary>
     public async Task EliminarAsync(long id, CancellationToken ct = default)
     {
